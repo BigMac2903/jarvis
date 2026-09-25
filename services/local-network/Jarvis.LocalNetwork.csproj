@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk.Web"><ItemGroup><ProjectReference Include="../../src/Jarvis.Domain/Jarvis.Domain.csproj" /><PackageReference Include="DnsClient" Version="1.8.0" /></ItemGroup></Project>

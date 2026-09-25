@@ -50,6 +50,18 @@ public class ApiIntegrationTests
         var approved=await client.PostAsJsonAsync("/api/v1/approvals/"+id,new{approve=true});Assert.Equal(HttpStatusCode.OK,approved.StatusCode);
         var duplicate=await client.PostAsJsonAsync("/api/v1/approvals/"+id,new{approve=true});Assert.Equal(HttpStatusCode.Conflict,duplicate.StatusCode);
         var memories=await client.GetFromJsonAsync<JsonArray>("/api/v1/memory/personal");Assert.Single(memories!);
+        // Registry operations use the real database, but never contact a LAN target.
+        var service=new{name="NAS",host="192.168.178.20",protocol="https",port=443,type="HTTP",permission="Read",readPaths=new[]{"/status"},password="discard-unknown-secret"};
+        Assert.Equal(HttpStatusCode.OK,(await client.PutAsJsonAsync("/api/v1/local-network/services/nas",service)).StatusCode);
+        var registry=(await client.GetFromJsonAsync<JsonArray>("/api/v1/local-network/services"))!;
+        var revision=registry[0]!["service"]!["revision"]!.GetValue<string>();
+        Assert.False(string.IsNullOrWhiteSpace(revision));Assert.DoesNotContain("discard-unknown-secret",registry.ToJsonString());
+        Assert.Equal(HttpStatusCode.OK,(await client.PutAsJsonAsync("/api/v1/local-network/services/nas",service)).StatusCode);
+        registry=(await client.GetFromJsonAsync<JsonArray>("/api/v1/local-network/services"))!;
+        Assert.NotEqual(revision,registry[0]!["service"]!["revision"]!.GetValue<string>());
+        Assert.Equal(HttpStatusCode.OK,(await client.GetAsync("/api/v1/approvals")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,(await client.DeleteAsync("/api/v1/local-network/services/nas")).StatusCode);
+        Assert.Empty((await client.GetFromJsonAsync<JsonArray>("/api/v1/local-network/services"))!);
         var pairingResponse=await client.PostAsJsonAsync("/api/v1/devices/pairing",new{});var pairing=(await pairingResponse.Content.ReadFromJsonAsync<JsonObject>())!;
         using var device=factory.CreateClient(new WebApplicationFactoryClientOptions{BaseAddress=new Uri("https://localhost"),HandleCookies=false});
         var paired=await device.PostAsJsonAsync("/api/v1/devices/pair",new{token=pairing["token"]!.GetValue<string>(),code=pairing["code"]!.GetValue<string>(),name="Unit device",platform="ios"});

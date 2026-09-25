@@ -34,7 +34,19 @@ PUT /browser/credentials/{serviceId} mit JSON:
 
 Dies ist ein administrativer HTTPS-Aufruf, kein Agent-Tool und keine Chatnachricht. Danach kann Web.Login mit serviceId und tab angefragt werden. Die Domain muss exakt mit der aktuell geöffneten Seite übereinstimmen. Das Modell erhält weder Passwort noch Benutzername aus dem Vault. submitSelector ist optional. Cookies bleiben geschützt im eigenen Profil; die Private-Option verwirft den Sitzungszustand beim Schließen. Beim Wechsel zwischen persistent und privat wird die bisherige Browsersitzung geschlossen.
 
-## Echtzeit
+## Lokales Netzwerk
+
+Alle Pfade mit Präfix `/api/v1`; Administrator-Sitzung und bei Änderungen CSRF erforderlich. Gerätetoken sind ausgeschlossen.
+
+- `GET /local-network/policy`: tatsächlich gestartete Deployment-Policy.
+- `GET /local-network/services`, `PUT/DELETE /local-network/services/{id}`: registrierte Dienste; jede Änderung erzeugt eine neue `revision` für Toolargumente/Freigaben.
+- `PUT/DELETE /local-network/credentials/{id}`: ausschließlich Vault-Zugangsdaten; kein lesender Credential-Endpunkt.
+- `POST /local-network/chat`: separater Agentenkontext; explizite Zustimmung zur Übermittlung an den eingestellten Modellanbieter erforderlich.
+- `GET/POST /local-network/files`, `GET/DELETE /local-network/files/{id}`: verschlüsselte Quarantäne, 5 MB je Datei, eine Stunde Abruffrist.
+
+Tools werden über die zentrale Tool-/Freigabe-API ausgeführt. Einschränkungen und Beispiele: [LOCAL_NETWORK.md](LOCAL_NETWORK.md).
+
+## Echtzeit und Webhooks
 
 SignalR unter /hubs/events sendet sachliche Events: research, job, tool, device, call, automation, notification. Die Verbindung erhält ausschließlich die Gruppe ihres angemeldeten Benutzers. Interne Modellüberlegungen werden nicht übertragen.
 

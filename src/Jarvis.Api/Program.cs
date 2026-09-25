@@ -30,7 +30,14 @@ builder.Services.AddSingleton<Settings>();
 builder.Services.AddSingleton<IAuthorizationStore,AuthorizationStore>();
 builder.Services.AddSingleton<IEventSink,EventSink>();
 builder.Services.AddHttpClient("provider",c=>c.Timeout=TimeSpan.FromSeconds(120)).ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false});
+// Existing Internet-facing HTTP connectors must not become an alternate route into a LAN.
+builder.Services.AddHttpClient("public-connector",c=>c.Timeout=TimeSpan.FromSeconds(30)).ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{
+    AllowAutoRedirect=false,UseProxy=true,Proxy=new System.Net.WebProxy(builder.Configuration["PUBLIC_CONNECTOR_PROXY"]??"http://jarvis-egress:8888")
+});
 builder.Services.AddHttpClient("browser",c=>c.Timeout=TimeSpan.FromSeconds(100));
+builder.Services.AddHttpClient("local-network",c=>c.Timeout=TimeSpan.FromSeconds(25)).ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false});
+builder.Services.AddSingleton<LocalNetworkTools>();
+builder.Services.AddSingleton<IToolHandler>(s=>s.GetRequiredService<LocalNetworkTools>());
 builder.Services.AddSingleton<AiClient>();
 builder.Services.AddSingleton<ModelRouter>();
 builder.Services.AddSingleton<IAutonomyPolicy,AutonomyPolicy>();
@@ -65,6 +72,7 @@ builder.Services.AddHostedService<AutomationWorker>();
 builder.Services.AddSingleton<TaskEngine>();
 builder.Services.AddHostedService(s=>s.GetRequiredService<TaskEngine>());
 builder.Services.AddHostedService<EventEngine>();
+builder.Services.AddHostedService<LocalServiceWatcher>();
 builder.Services.AddSingleton<IToolHandler,NotificationTools>();
 var app=builder.Build();
 _ = app.Services.GetRequiredService<Vault>();
@@ -104,6 +112,7 @@ app.MapPhone();
 app.MapPhoneRelay();
 app.MapSip();
 app.MapOperator();
+app.MapLocalNetwork();
 app.MapAutomationHooks();
 app.Run();
 public partial class Program;

@@ -3,7 +3,7 @@ using Jarvis.Domain;
 namespace Jarvis.Infrastructure;
 public sealed class Settings(IDocumentStore store, Vault vault)
 {
-    public static readonly HashSet<string> Sections = ["ai", "internet", "google", "microsoft", "twilio", "obsidian", "voice", "phone", "sip", "nextcloud", "immich", "autonomy", "budget", "events"];
+    public static readonly HashSet<string> Sections = ["ai", "internet", "google", "microsoft", "twilio", "obsidian", "voice", "phone", "sip", "nextcloud", "immich", "autonomy", "budget", "events", "local-network"];
     public async Task<JsonObject> GetAsync(string owner, string section, CancellationToken ct) =>
         (await store.GetAsync(owner, "settings", section, ct))?.Data ?? new JsonObject();
     public async Task SaveAsync(string owner, string section, JsonObject data, CancellationToken ct)
@@ -11,6 +11,13 @@ public sealed class Settings(IDocumentStore store, Vault vault)
         if (!Sections.Contains(section)) throw new JarvisException("Unbekannter Einstellungsbereich.");
         if (data.ToJsonString().Length > 20000) throw new JarvisException("Konfiguration zu groß.");
         var copy = data.DeepClone().AsObject();
+        if(section=="local-network") {
+            var entries=PhonePolicy.Strings(copy["allowlist"]);
+            if(entries.Count>100)throw new JarvisException("Allowlist maximal 100 Einträge.");
+            copy["allowlist"]=new JsonArray(entries.Select(e=>(JsonNode?)JsonValue.Create(LocalNetworkPolicy.Entry(e))).ToArray());
+            if(copy["ports"] is not JsonArray ports || ports.Count>30 || ports.Any(p=>p is not JsonValue v || !v.TryGetValue<int>(out var number) || number is <1 or >65535))throw new JarvisException("Bis zu 30 einzelne erlaubte Ports erforderlich.");
+            if(copy["discoveryEnabled"]?.GetValue<bool>()==true && copy["probesEnabled"]?.GetValue<bool>()!=true)throw new JarvisException("Dienstprüfung benötigt explizite Host-/Portfreigabe.");
+        }
         if (section == "budget") {
             foreach (var key in new[] { "dailySoft", "dailyHard", "monthlySoft", "monthlyHard" })
                 if (copy[key] is JsonNode limit && (limit.GetValue<decimal>() < 0 || limit.GetValue<decimal>() > 100000)) throw new JarvisException("Budget muss zwischen 0 und 100.000 USD liegen.");

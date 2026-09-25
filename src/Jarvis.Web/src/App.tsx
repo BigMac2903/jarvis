@@ -4,7 +4,8 @@ import {Activity,ArrowUpRight,AudioLines,BookOpen,Calendar,Camera,Check,ChevronR
 import {api,Doc,errorText,setCsrf} from './api';
 import Auth from './Auth';import Settings from './Settings';import Voice from './Voice';import {Approvals,DataPanel,Permissions,ToolPanel} from './Panels';
 import {TaskBoard,PersonalMemoryPanel,ModelDashboard,SipStatus} from './OperatorPanels';
-const nav=[['Home',Home],['Chat',MessageSquare],['Voice',AudioLines],['Research',Compass],['Browser',Globe],['Devices',Monitor],['Tasks & Goals',Layers],['Nextcloud',BookOpen],['Immich',Camera],['Calendar',Calendar],['Mail',Mail],['Phone',Phone],['Calls',Phone],['Memory',BookOpen],['Obsidian',Layers],['Automations',Activity],['Contacts',Users],['AI Models',Terminal],['Freigaben',Check],['Permissions',Shield],['Audit Log',Activity],['Events',Activity],['System',Layers],['Settings',SettingsIcon]] as const;
+import LocalNetwork from './LocalNetwork';
+const nav=[['Home',Home],['Chat',MessageSquare],['Voice',AudioLines],['Research',Compass],['Browser',Globe],['Devices',Monitor],['Local Network',Shield],['Tasks & Goals',Layers],['Nextcloud',BookOpen],['Immich',Camera],['Calendar',Calendar],['Mail',Mail],['Phone',Phone],['Calls',Phone],['Memory',BookOpen],['Obsidian',Layers],['Automations',Activity],['Contacts',Users],['AI Models',Terminal],['Freigaben',Check],['Permissions',Shield],['Audit Log',Activity],['Events',Activity],['System',Layers],['Settings',SettingsIcon]] as const;
 function safeUrl(url:string){try{const u=new URL(url);return ['http:','https:'].includes(u.protocol)?u.href:'#'}catch{return '#'}}
 export default function App(){
  const[ready,setReady]=useState(false),[setup,setSetup]=useState(false),[user,setUser]=useState<any>(),[page,setPage]=useState('Home'),[error,setError]=useState(''),[menu,setMenu]=useState(false);
@@ -34,6 +35,7 @@ export default function App(){
  {page==='Chat'&&<Chat/>}{page==='Voice'&&<Voice/>}{page==='Research'&&<><Research events={events}/><DataPanel kind="research" title="Gesamter Rechercheverlauf"/></>}
  {page==='Browser'&&<><p className="notice">Öffne einen Tab, nutze dessen ID für weitere Aktionen und fordere einen Screenshot an. Klicks und Formulare benötigen eine Freigabe.</p><ToolPanel prefix="Web."/><ToolPanel prefix="Browser."/></>}
  {page==='Devices'&&<Devices devices={devices} refresh={refresh}/>}
+ {page==='Local Network'&&<LocalNetwork/>}
  {page==='Calendar'&&<ToolPanel prefix="Calendar."/>}{page==='Mail'&&<ToolPanel prefix="Mail."/>}{page==='Phone'&&<><SipStatus/><ToolPanel prefix="Phone."/></>}
  {page==='Calls'&&<DataPanel kind="calls" title="Gespräche & Ergebnisse"/>}
  {page==='Memory'&&<><PersonalMemoryPanel/><ToolPanel prefix="Memory."/><DataPanel kind="memory" title="Legacy-Erinnerungen (nicht verschlüsselt; manuell übernehmen)"/></>}

@@ -4,6 +4,8 @@ Dieser Stand unterscheidet implementierten Code von tatsächlich geprüften Inte
 
 Ergänzungen 61–200 im Detail: [Anforderungsmatrix](REQUIREMENTS-61-200.md), [SIP-Einrichtung](SIP.md), [Operator/Konnektoren/Memory/Modelle](OPERATOR.md).
 
+Ergänzung 201–213: [Local Network](LOCAL_NETWORK.md). Separater Agent, zweistufige CIDR-/Host-/Portpolicy, DNS-Pinning, dedizierter privater Resolver, Service Registry, Vault-Auth, Dateiquarantäne, getrennte lokale Aufträge und optionaler niedrigfrequenter Registry-Checker. Keine allgemeine Subnetzsuche oder automatischen Produktfingerprints; kein VPN-Provisioning. Private Nextcloud-/Immich-Spezialadapter noch nicht an den neuen Pfad angeschlossen. Lokale Policy-, Agent-HTTP- und UI-Tests bestanden; Docker-/DNS-/VPN-/Geräteabnahme offen.
+
 | Bereich | Implementierung | Tatsächlicher Prüfstand |
 |---|---|---|
 | .NET Backend / Layer | API, Domain, Application, Infrastructure, Agent | Lokal kompiliert, Unit-/Security-Tests bestanden |

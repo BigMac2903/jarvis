@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 command -v openssl >/dev/null || { echo "openssl fehlt."; exit 1; }
 if [ ! -f .env ]; then cp .env.example .env; fi
 chmod 600 .env
-for key in POSTGRES_PASSWORD REDIS_PASSWORD MASTER_KEY BROWSER_MASTER_KEY BROWSER_TOKEN SETUP_TOKEN SEARXNG_SECRET SIP_SERVICE_TOKEN; do
+for key in POSTGRES_PASSWORD REDIS_PASSWORD MASTER_KEY BROWSER_MASTER_KEY BROWSER_TOKEN SETUP_TOKEN SEARXNG_SECRET SIP_SERVICE_TOKEN LOCAL_NETWORK_TOKEN; do
   if ! grep -q "^$key=" .env; then printf '\n%s=\n' "$key" >> .env; fi
   if grep -q "^$key=$" .env; then
     case "$key" in MASTER_KEY|BROWSER_MASTER_KEY) value="$(openssl rand -base64 32)";; *) value="$(openssl rand -hex 32)";; esac

@@ -6,6 +6,8 @@ Der separate SIP-Dienst und die SIP-Tests verwenden SIPSorcery 10.0.16. Upstream
 
 ## Browser und weitere Pakete
 
+Der lokale Netzwerkdienst verwendet DnsClient.NET 1.8.0, Copyright (c) 2024 Michael Conrad, unter Apache-2.0. [Upstream](https://github.com/MichaCo/DnsClient.NET), [Paket](https://www.nuget.org/packages/DnsClient/1.8.0); vollständiger Lizenztext: [Apache-2.0](LICENSE-APACHE-2.0.txt).
+
 Der vollständige Apache-2.0-Lizenztext ist in LICENSE-APACHE-2.0.txt enthalten. Copyright (c) Microsoft Corporation für den übernommenen Playwright-Bestandteil.
 
 Das Docker-seccomp-Profil basiert auf microsoft/playwright, utils/docker/seccomp_profile.json, Version v1.51.1, das seinerseits auf dem Docker/Moby-Standardprofil basiert. Ergänzt wurde eine explizite ENOSYS-Antwort für clone3, damit libc auf clone zurückfällt. Quelle: https://github.com/microsoft/playwright/blob/v1.51.1/utils/docker/seccomp_profile.json . Playwright und Docker/Moby stehen unter Apache-2.0.

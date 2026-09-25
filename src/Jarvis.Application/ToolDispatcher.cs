@@ -34,6 +34,7 @@ public sealed class ToolDispatcher(IEnumerable<IToolHandler> handlers, IAuthoriz
     public async Task<ToolResult> ExecuteAsync(Actor actor, string name, JsonObject args, string? approval, CancellationToken ct)
     {
         if (actor.DeviceId is not null) throw new JarvisException("Geräte dürfen keine Agent-Tools aufrufen.", 403);
+        if (name.StartsWith("LocalNetwork.",StringComparison.Ordinal) && !LocalNetworkScope.Allowed) throw new JarvisException("Local-Network-Tools sind für öffentliche Recherche und gewöhnliche Agentenaufträge gesperrt.",403);
         if (!tools.TryGetValue(name, out var tool)) throw new JarvisException("Unbekanntes Tool.", 404);
         var timer = Stopwatch.StartNew(); var status = "error";
         try

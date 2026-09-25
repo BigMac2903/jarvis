@@ -2,7 +2,7 @@ param([string]$Destination = (Join-Path (Split-Path $PSScriptRoot -Parent) '.env
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
 if (Test-Path -LiteralPath $Destination) { $content = Get-Content -LiteralPath $Destination -Raw } else { $content = Get-Content -LiteralPath (Join-Path $repoRoot '.env.example') -Raw }
-foreach ($key in @('POSTGRES_PASSWORD','REDIS_PASSWORD','MASTER_KEY','BROWSER_MASTER_KEY','BROWSER_TOKEN','SETUP_TOKEN','SEARXNG_SECRET','SIP_SERVICE_TOKEN')) {
+foreach ($key in @('POSTGRES_PASSWORD','REDIS_PASSWORD','MASTER_KEY','BROWSER_MASTER_KEY','BROWSER_TOKEN','SETUP_TOKEN','SEARXNG_SECRET','SIP_SERVICE_TOKEN','LOCAL_NETWORK_TOKEN')) {
     if ($content -notmatch "(?m)^$key=") { $content += "`n$key=`n" }
     if ($content -match "(?m)^$key=\s*$") {
         $bytes = New-Object byte[] 32

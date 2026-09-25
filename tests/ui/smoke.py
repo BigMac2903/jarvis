@@ -52,14 +52,17 @@ with sync_playwright() as p:
     page.wait_for_timeout(350)
     page.screenshot(path=str(out/'research-mobile.png'),full_page=True)
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'research mobile overflow'
-    for button, heading, slug in [('Tasks & Goals','Ziele statt Mikrobefehle','tasks'),('Memory','Persönliches Gedächtnis','memory'),('AI Models','Modelle & Verbrauch','models'),('Phone','SIP-Telefonie','sip')]:
+    for button, heading, slug in [('Tasks & Goals','Ziele statt Mikrobefehle','tasks'),('Memory','Persönliches Gedächtnis','memory'),('AI Models','Modelle & Verbrauch','models'),('Phone','SIP-Telefonie','sip'),('Local Network','Lokales Netzwerk – getrennt von Research','local-network')]:
         page.get_by_role('button',name='Menü',exact=True).click()
         page.get_by_role('button',name=button,exact=True).click()
         page.get_by_role('heading',name=heading,exact=True).wait_for()
         page.wait_for_timeout(150)
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), slug+' mobile overflow'
         page.screenshot(path=str(out/(slug+'-mobile.png')),full_page=True)
+        if slug=='local-network':
+            page.get_by_role('heading',name=heading,exact=True).scroll_into_view_if_needed()
+            page.screenshot(path=str(out/'local-network-top-mobile.png'))
     assert not errors, errors
     browser.close()
 server.shutdown()
-print('PASS: setup/dashboard/research/tasks/memory/models/SIP rendering, responsive widths, no uncaught UI errors (explicit API fixtures; not backend integration)')
+print('PASS: setup/dashboard/research/tasks/memory/models/SIP/local-network rendering, responsive widths, no uncaught UI errors (explicit API fixtures; not backend integration)')

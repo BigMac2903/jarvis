@@ -1,11 +1,9 @@
 """DNS-pinning forward proxy. Only this container has a non-internal network."""
 import asyncio
 import ipaddress
-import os
 import socket
 from urllib.parse import urlsplit
 
-ALLOW_HOSTS = frozenset(h.strip().lower() for h in os.getenv("INTERNAL_ALLOW_HOSTS", "").split(",") if h.strip())
 
 def public_ip(value: str) -> bool:
     ip = ipaddress.ip_address(value)
@@ -22,7 +20,7 @@ async def resolve(host: str, port: int):
         raise ValueError("blocked host")
     infos = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
     addresses = list(dict.fromkeys(info[4][0] for info in infos))
-    if not addresses or (host not in ALLOW_HOSTS and any(not public_ip(ip) for ip in addresses)):
+    if not addresses or any(not public_ip(ip) for ip in addresses):
         raise ValueError("non-public destination")
     return addresses[0]
 

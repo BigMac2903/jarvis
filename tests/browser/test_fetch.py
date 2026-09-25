@@ -6,6 +6,11 @@ from unittest.mock import AsyncMock, patch
 sys.path.insert(0, str(pathlib.Path(__file__).parents[2] / "services" / "browser"))
 import egress
 class DnsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_old_internal_exception_never_bypasses_private_block(self):
+        answers=[(2,1,6,"",("192.168.178.20",443))]
+        with patch.dict("os.environ", {"INTERNAL_ALLOW_HOSTS":"nas.local","LOCAL_NETWORK_ENABLED":"true"}), patch.object(asyncio.get_running_loop(),"getaddrinfo",new=AsyncMock(return_value=answers)):
+            with self.assertRaises(ValueError):
+                await egress.resolve("nas.local",443)
     async def test_mixed_public_private_dns_is_denied(self):
         answers=[(2,1,6,"",("1.1.1.1",443)),(2,1,6,"",("127.0.0.1",443))]
         with patch.object(asyncio.get_running_loop(),"getaddrinfo",new=AsyncMock(return_value=answers)):

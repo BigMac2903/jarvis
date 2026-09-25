@@ -54,6 +54,8 @@ services:
       BROWSER_TOKEN: ${BROWSER_TOKEN:?Run install script first}
       SIP_SERVICE_TOKEN: ${SIP_SERVICE_TOKEN:?Run install script first}
       SIP_SERVICE_URL: http://jarvis-sip:8080
+      LOCAL_NETWORK_TOKEN: ${LOCAL_NETWORK_TOKEN:?Run install script first}
+      LOCAL_NETWORK_URL: http://jarvis-local-network-agent:8080
       OBSIDIAN_PATH: /data/obsidian
       Logging__LogLevel__Default: Information
       Logging__LogLevel__Microsoft.AspNetCore: Warning
@@ -61,7 +63,7 @@ services:
     volumes:
       - api-data:/data/jarvis
       - ${OBSIDIAN_HOST_PATH:-./data/obsidian}:/data/obsidian
-    networks: [backend, browser-control, outbound]
+    networks: [backend, browser-control, outbound, local-control]
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
@@ -143,13 +145,34 @@ services:
     build:
       context: .
       dockerfile: services/browser/Dockerfile.egress
-    environment:
-      INTERNAL_ALLOW_HOSTS: ${INTERNAL_ALLOW_HOSTS:-}
     networks: [browser-egress, outbound]
     read_only: true
     cap_drop: [ALL]
     pids_limit: 64
     mem_limit: 128m
+  jarvis-local-network-agent:
+    <<: *defaults
+    profiles: [local-network]
+    build:
+      context: .
+      dockerfile: services/local-network/Dockerfile
+    environment:
+      LOCAL_NETWORK_TOKEN: ${LOCAL_NETWORK_TOKEN}
+      LOCAL_NETWORK_ENABLED: ${LOCAL_NETWORK_ENABLED:-false}
+      LOCAL_NETWORK_ALLOWLIST: ${LOCAL_NETWORK_ALLOWLIST:-}
+      LOCAL_NETWORK_PORTS: ${LOCAL_NETWORK_PORTS:-80,443}
+      LOCAL_NETWORK_PROBES_ENABLED: ${LOCAL_NETWORK_PROBES_ENABLED:-false}
+      LOCAL_NETWORK_DENYLIST: ${LOCAL_NETWORK_DENYLIST:-}
+      LOCAL_NETWORK_DNS: ${LOCAL_NETWORK_DNS:-}
+      Logging__LogLevel__Default: Warning
+      Logging__LogLevel__System.Net.Http.HttpClient: None
+    networks: [local-control, local-egress]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
   jarvis-sip:
     <<: *defaults
     profiles: [sip]
@@ -215,6 +238,13 @@ networks:
   browser-control: {internal: true}
   browser-egress: {internal: true}
   outbound: {}
+  local-control:
+    internal: true
+    ipam:
+      config: [{subnet: 172.30.254.0/28}]
+  local-egress:
+    ipam:
+      config: [{subnet: 172.30.254.16/28}]
 volumes:
   postgres-data:
   redis-data:

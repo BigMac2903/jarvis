@@ -4,6 +4,9 @@
     <Project Path="agents/windows/Jarvis.Windows.csproj" />
   </Folder>
   <Folder Name="/services/" />
+  <Folder Name="/services/local-network/">
+    <Project Path="services/local-network/Jarvis.LocalNetwork.csproj" />
+  </Folder>
   <Folder Name="/services/sip/">
     <Project Path="services/sip/Jarvis.Sip.csproj" />
   </Folder>

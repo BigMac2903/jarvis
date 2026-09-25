@@ -14,8 +14,11 @@ public static class AgentEndpoints
     {
         app.MapPost("/api/v1/chat",async(ChatRequest request,HttpContext ctx,Orchestrator agent,CancellationToken ct)=>
             await agent.ChatAsync(ctx.Owner(),request.Conversation??Guid.NewGuid().ToString("N"),request.Message,request.Image,ct));
-        app.MapPost("/api/v1/tools/execute",async(ToolRequest request,HttpContext ctx,ToolDispatcher tools,CancellationToken ct)=>
-            await tools.ExecuteAsync(new(ctx.Owner()),request.Name,request.Args,null,ct));
+        app.MapPost("/api/v1/tools/execute",async(ToolRequest request,HttpContext ctx,ToolDispatcher tools,CancellationToken ct)=> {
+            // Direct authenticated UI action, never a tool provided to the public research model.
+            using var local = request.Name.StartsWith("LocalNetwork.",StringComparison.Ordinal) ? new LocalNetworkScope() : null;
+            return await tools.ExecuteAsync(new(ctx.Owner()),request.Name,request.Args,null,ct);
+        });
         app.MapPost("/api/v1/research",async(ResearchRequest request,HttpContext ctx,Database db,CancellationToken ct)=>{
             if(request.Question.Length is <3 or >10000||request.Mode is not ("quick" or "research" or "deep"))throw new JarvisException("Ungültige Recherche.");
             var id=Guid.NewGuid().ToString("N");

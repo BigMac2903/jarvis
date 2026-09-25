@@ -42,12 +42,13 @@ public static class AdminEndpoints
             if(data["tenMinutes"]?.GetValue<bool>()==true)saved["expiresAt"]=DateTimeOffset.UtcNow.AddMinutes(10).ToString("O");
             await db.PutAsync(ctx.Owner(),"permissions",tool,saved,ct);await audit.AuditAsync(ctx.Owner(),"Permissions.Update","success",0,null,new(){["tool"]=tool},ct);return Results.Ok();
         });
-        app.MapGet("/api/v1/approvals",async(HttpContext ctx,Database db,CancellationToken ct)=>await db.QueryAsync("SELECT id,tool,args::text,state,expires_at,created_at FROM approvals WHERE owner=$1 AND state='pending' AND expires_at>now() ORDER BY created_at DESC",ct,ctx.Owner()));
+        app.MapGet("/api/v1/approvals",async(HttpContext ctx,Database db,CancellationToken ct)=>await db.QueryAsync("SELECT a.id,a.tool,a.args::text,a.state,a.expires_at,a.created_at,d.data->>'host' AS local_host,d.data->>'port' AS local_port,d.data->>'revision' AS local_revision FROM approvals a LEFT JOIN documents d ON d.owner=a.owner AND d.kind='local-services' AND d.id=a.args->>'serviceId' AND a.tool LIKE 'LocalNetwork.%' WHERE a.owner=$1 AND a.state='pending' AND a.expires_at>now() ORDER BY a.created_at DESC",ct,ctx.Owner()));
         app.MapPost("/api/v1/approvals/{id}",async(string id,Decision decision,HttpContext ctx,Database db,ToolDispatcher tools,CancellationToken ct)=>{
             var rows=await db.QueryAsync("UPDATE approvals SET state=$1 WHERE id=$2 AND owner=$3 AND state='pending' AND expires_at>now() RETURNING tool,args::text,task_id",ct,decision.Approve?"approved":"denied",id,ctx.Owner());
             if(rows.Count!=1)throw new JarvisException("Freigabe abgelaufen oder bereits bearbeitet.",409);
             ToolResult result;
             using var taskScope=new ExecutionScope(rows[0]["task_id"]?.GetValue<string>());
+            using var localScope=rows[0]["tool"]!.GetValue<string>().StartsWith("LocalNetwork.",StringComparison.Ordinal)?new LocalNetworkScope():null;
             try { result=!decision.Approve?new ToolResult("denied"):await tools.ExecuteAsync(new(ctx.Owner()),rows[0]["tool"]!.GetValue<string>(),JsonNode.Parse(rows[0]["args"]!.GetValue<string>())!.AsObject(),id,ct); }
             catch { await db.PutAsync(ctx.Owner(),"approval-results",id,new(){["Status"]="failed_or_unknown"},CancellationToken.None);throw; }
             await db.PutAsync(ctx.Owner(),"approval-results",id,System.Text.Json.JsonSerializer.SerializeToNode(result)!.AsObject(),ct);

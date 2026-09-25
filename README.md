@@ -4,6 +4,8 @@ Ein persönlicher, lokal selbst hostbarer KI-Assistent mit Chat, Sprache, Recher
 
 Neu: SIP als Standardtelefonie, Nextcloud/Immich, verschlüsseltes persönliches Memory mit Importvorschau, Aufgaben/Ziele, Ereignisregeln sowie Modellregistry und Budgetjournal. Einrichtung: [SIP](docs/SIP.md) und [Operator/Konnektoren/Modelle](docs/OPERATOR.md). Die [Matrix 61–200](docs/REQUIREMENTS-61-200.md) nennt ausdrücklich auch noch fehlende Anforderungen.
 
+Ergänzung 201–213: [Local Network](docs/LOCAL_NETWORK.md) mit separatem Agenten, zweistufiger Allowlist, explizitem lokalem DNS, Registry, Vault-Credentials, lokalem Auftragskontext und begrenzten Prüfungen. Standardmäßig deaktiviert. Die frühere Research-Ausnahme `INTERNAL_ALLOW_HOSTS` entfällt; private Nextcloud-/Immich-Endpunkte müssen über den lokalen Zugriff eingerichtet werden. Die Anleitung beschreibt die noch fehlende Durchleitung der Spezialadapter sowie den VPN-Prüfstand.
+
 **Prüfstand:** Quellcode, lokale Builds, Sicherheitsprüfungen und ein echter Chromium-Smoke-Test sind vorhanden. Auf dem Entwicklungsrechner fehlt die Docker-Engine; der vollständige Containerstart und die PostgreSQL-/Redis-Integration sind dort noch nicht abgenommen. Dies ist keine Behauptung eines fertig geprüften Produktivsystems. Details und verbleibende Grenzen stehen in [PROJECT_STATE.md](PROJECT_STATE.md) und [Funktionsstatus](docs/STATUS.md).
 
 ## 1. Was du brauchst

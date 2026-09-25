@@ -30,7 +30,7 @@ public sealed class ConnectorHttp(IHttpClientFactory clients, Settings settings,
         var url = new Uri(root, relative);
         if (!url.AbsoluteUri.StartsWith(root.AbsoluteUri, StringComparison.Ordinal) || relative.StartsWith('/') || relative.Contains(".."))
             throw new JarvisException("Connector-Ziel außerhalb der Konfiguration.", 403);
-        using var client = clients.CreateClient("provider"); // Redirects disabled: credentials never follow Location.
+        using var client = clients.CreateClient("public-connector"); // Public-only pinned egress; LAN access belongs to the separate local agent.
         using var request = new HttpRequestMessage(method, url) { Content = content };
         if (connector == "nextcloud")
         {
