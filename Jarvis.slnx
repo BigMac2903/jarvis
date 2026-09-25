@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/agents/" />
+  <Folder Name="/agents/windows/">
+    <Project Path="agents/windows/Jarvis.Windows.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Jarvis.Agent/Jarvis.Agent.csproj" />
+    <Project Path="src/Jarvis.Api/Jarvis.Api.csproj" />
+    <Project Path="src/Jarvis.Application/Jarvis.Application.csproj" />
+    <Project Path="src/Jarvis.Domain/Jarvis.Domain.csproj" />
+    <Project Path="src/Jarvis.Infrastructure/Jarvis.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Jarvis.Tests/Jarvis.Tests.csproj" />
+  </Folder>
+</Solution>

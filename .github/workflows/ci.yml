@@ -1,0 +1,70 @@
+name: verify
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: jarvis
+          POSTGRES_PASSWORD: ci-ephemeral-password
+          POSTGRES_DB: jarvis_test
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U jarvis" --health-interval 5s --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: {dotnet-version: "10.0.x"}
+      - run: dotnet test tests/Jarvis.Tests/Jarvis.Tests.csproj -c Release --logger trx
+        env:
+          JARVIS_TEST_DATABASE: Host=localhost;Database=jarvis_test;Username=jarvis;Password=ci-ephemeral-password
+          JARVIS_TEST_REDIS: localhost:6379
+      - run: python -m unittest discover -s tests/browser -v
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22", cache: npm, cache-dependency-path: src/Jarvis.Web/package-lock.json}
+      - run: npm ci && npm run build && npm audit --omit=dev
+        working-directory: src/Jarvis.Web
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r services/browser/requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: python tests/ui/smoke.py
+      - run: python -m unittest discover -s tests/browser -v
+      - run: python tests/browser/smoke_live.py
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash install.sh --configure-only
+      - run: docker compose config --quiet
+      - run: docker compose build
+      - run: docker compose up -d --wait --wait-timeout 300
+      - run: bash scripts/verify-installation.sh
+      - run: docker compose logs --no-color
+        if: failure()
+      - run: docker compose down -v
+        if: always()
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: {dotnet-version: "10.0.x"}
+      - run: dotnet build agents/windows/Jarvis.Windows.csproj -c Release
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift build -c release
+        working-directory: agents/macos

@@ -1,0 +1,22 @@
+{
+    admin localhost:2019
+}
+{$SITE_ADDRESS:localhost} {
+    encode zstd gzip
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Permissions-Policy "camera=(self), microphone=(self), geolocation=(self), payment=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.openai.com wss://api.openai.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        Strict-Transport-Security "max-age=31536000"
+        -Server
+    }
+    @backend path /api/* /hubs/* /health/* /openapi/*
+    handle @backend {
+        reverse_proxy jarvis-api:8080
+    }
+    handle {
+        reverse_proxy jarvis-web:8080
+    }
+}

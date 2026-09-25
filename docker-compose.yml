@@ -1,0 +1,205 @@
+name: jarvis
+x-defaults: &defaults
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  security_opt:
+    - no-new-privileges:true
+services:
+  postgres:
+    <<: *defaults
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: jarvis
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run install script first}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  redis:
+    <<: *defaults
+    image: redis:7.4-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Run install script first}
+    command: [sh, -c, 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    volumes:
+      - redis-data:/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  jarvis-api:
+    <<: *defaults
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      DATABASE_URL: Host=postgres;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD}
+      REDIS_URL: redis:6379,password=${REDIS_PASSWORD},abortConnect=false
+      PUBLIC_URL: ${PUBLIC_URL:-https://localhost}
+      MASTER_KEY: ${MASTER_KEY:?Run install script first}
+      SETUP_TOKEN: ${SETUP_TOKEN:?Run install script first}
+      BROWSER_URL: http://jarvis-browser:8000
+      BROWSER_TOKEN: ${BROWSER_TOKEN:?Run install script first}
+      OBSIDIAN_PATH: /data/obsidian
+      Logging__LogLevel__Default: Information
+      Logging__LogLevel__Microsoft.AspNetCore: Warning
+      Logging__LogLevel__System.Net.Http.HttpClient: Warning
+    volumes:
+      - api-data:/data/jarvis
+      - ${OBSIDIAN_HOST_PATH:-./data/obsidian}:/data/obsidian
+    networks: [backend, browser-control, outbound]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+  jarvis-web:
+    <<: *defaults
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    networks: [frontend]
+    read_only: true
+    tmpfs: [/tmp, /var/cache/nginx, /var/run]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+  reverse-proxy:
+    <<: *defaults
+    image: caddy:2.10-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [frontend, backend, outbound]
+    depends_on:
+      jarvis-api: {condition: service_healthy}
+      jarvis-web: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+  jarvis-browser:
+    <<: *defaults
+    build:
+      context: .
+      dockerfile: services/browser/Dockerfile
+    environment:
+      BROWSER_TOKEN: ${BROWSER_TOKEN}
+      MASTER_KEY: ${BROWSER_MASTER_KEY:?Run install script first}
+      EGRESS_PROXY: http://jarvis-egress:8888
+      CLAMAV_HOST: ${CLAMAV_HOST:-}
+      HOME: /tmp/home
+    volumes:
+      - browser-data:/data
+    networks: [browser-control, browser-egress]
+    read_only: true
+    init: true
+    tmpfs: ["/tmp:uid=10001,gid=10001,mode=1770"]
+    shm_size: 512mb
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./docker/browser-seccomp.json
+    pids_limit: 256
+    cpus: 2.0
+    mem_limit: 2g
+    depends_on:
+      jarvis-egress: {condition: service_healthy}
+  jarvis-egress:
+    <<: *defaults
+    build:
+      context: .
+      dockerfile: services/browser/Dockerfile.egress
+    environment:
+      INTERNAL_ALLOW_HOSTS: ${INTERNAL_ALLOW_HOSTS:-}
+    networks: [browser-egress, outbound]
+    read_only: true
+    cap_drop: [ALL]
+    pids_limit: 64
+    mem_limit: 128m
+  jarvis-search:
+    <<: *defaults
+    image: searxng/searxng:latest
+    profiles: [search]
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-}
+    volumes:
+      - ./docker/searxng.yml:/etc/searxng/settings.yml:ro
+      - search-cache:/var/cache/searxng
+    networks: [backend, outbound]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+  ollama:
+    <<: *defaults
+    image: ollama/ollama:latest
+    profiles: [local-ai]
+    volumes: [ollama-data:/root/.ollama]
+    networks: [backend, outbound]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+  clamav:
+    <<: *defaults
+    image: clamav/clamav:stable
+    profiles: [antivirus]
+    volumes: [clamav-data:/var/lib/clamav]
+    networks: [browser-control, outbound]
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "3"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+networks:
+  frontend: {internal: true}
+  backend: {internal: true}
+  browser-control: {internal: true}
+  browser-egress: {internal: true}
+  outbound: {}
+volumes:
+  postgres-data:
+  redis-data:
+  api-data:
+  browser-data:
+  caddy-data:
+  caddy-config:
+  search-cache:
+  ollama-data:
+  clamav-data:

@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><ProjectReference Include="../Jarvis.Infrastructure/Jarvis.Infrastructure.csproj" /><PackageReference Include="Cronos" Version="0.13.0" /></ItemGroup></Project>

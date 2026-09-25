@@ -1,0 +1,6 @@
+services:
+  jarvis-api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Logging__LogLevel__Default: Debug
+# Same security boundaries and ports as production. Rebuild after source changes.
