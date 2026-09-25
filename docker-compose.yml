@@ -52,6 +52,8 @@ services:
       SETUP_TOKEN: ${SETUP_TOKEN:?Run install script first}
       BROWSER_URL: http://jarvis-browser:8000
       BROWSER_TOKEN: ${BROWSER_TOKEN:?Run install script first}
+      SIP_SERVICE_TOKEN: ${SIP_SERVICE_TOKEN:?Run install script first}
+      SIP_SERVICE_URL: http://jarvis-sip:8080
       OBSIDIAN_PATH: /data/obsidian
       Logging__LogLevel__Default: Information
       Logging__LogLevel__Microsoft.AspNetCore: Warning
@@ -148,6 +150,26 @@ services:
     cap_drop: [ALL]
     pids_limit: 64
     mem_limit: 128m
+  jarvis-sip:
+    <<: *defaults
+    profiles: [sip]
+    build:
+      context: .
+      dockerfile: services/sip/Dockerfile
+    environment:
+      SIP_SERVICE_TOKEN: ${SIP_SERVICE_TOKEN}
+      CORE_URL: http://jarvis-api:8080
+      SIP_ADVERTISE_ADDRESS: ${SIP_ADVERTISE_ADDRESS:-}
+      Logging__LogLevel__Default: Warning
+      Logging__LogLevel__System.Net.Http.HttpClient: None
+    networks: [backend, outbound]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    pids_limit: 128
+    mem_limit: 512m
+    depends_on:
+      jarvis-api: {condition: service_healthy}
   jarvis-search:
     <<: *defaults
     image: searxng/searxng:latest

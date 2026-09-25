@@ -2,14 +2,14 @@ using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Jarvis.Domain;
 namespace Jarvis.Application;
-public sealed class ToolDispatcher(IEnumerable<IToolHandler> handlers, IAuthorizationStore auth)
+public sealed class ToolDispatcher(IEnumerable<IToolHandler> handlers, IAuthorizationStore auth, IAutonomyPolicy? autonomy = null, IEventSink? events = null, IActionLedger? ledger = null)
 {
     private readonly Dictionary<string, (ToolDefinition Definition, IToolHandler Handler)> tools =
         handlers.SelectMany(h => h.Definitions.Select(d => (d, h))).ToDictionary(x => x.d.Name, x => (x.d, x.h));
     public IReadOnlyList<ToolDefinition> Definitions => tools.Values.Select(x => x.Definition).ToArray();
     public static Permission Resolve(Risk risk, Permission? configured) =>
         configured == Permission.Deny ? Permission.Deny : risk == Risk.AlwaysConfirm ? Permission.Ask :
-        configured ?? (risk == Risk.Safe ? Permission.Allow : Permission.Ask);
+        configured == Permission.AlwaysConfirm ? Permission.Ask : configured == Permission.Auto ? Permission.Allow : configured ?? (risk == Risk.Safe ? Permission.Allow : Permission.Ask);
     public static void Validate(ToolDefinition tool, JsonObject args)
     {
         if (args.Count > tool.Fields.Count) throw new JarvisException("Unbekannte Parameter.");
@@ -39,8 +39,12 @@ public sealed class ToolDispatcher(IEnumerable<IToolHandler> handlers, IAuthoriz
         try
         {
             Validate(tool.Definition, args);
-            var permission = Resolve(tool.Definition.Risk, await auth.GetPermissionAsync(actor.UserId, name, ct));
+            var configured = await auth.GetPermissionAsync(actor.UserId, name, ct);
+            if(autonomy is not null)configured = await autonomy.ResolveAsync(actor.UserId,tool.Definition,configured,ct);
+            var permission = Resolve(tool.Definition.Risk, configured);
             if (permission == Permission.Deny) throw new JarvisException("Aktion gesperrt.", 403);
+            var taskId = tool.Definition.Risk != Risk.Safe ? ExecutionScope.TaskId : null;
+            if(taskId is not null && ledger is not null && await ledger.FindAsync(actor.UserId,taskId,name,args,ct) is ToolResult recorded){status="replayed";return recorded;}
             if (permission == Permission.Ask && (approval is null || !await auth.ConsumeAsync(actor.UserId, approval, name, args, ct)))
             {
                 status = "approval_required";
@@ -48,7 +52,10 @@ public sealed class ToolDispatcher(IEnumerable<IToolHandler> handlers, IAuthoriz
             }
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeout.CancelAfter(TimeSpan.FromSeconds(tool.Definition.TimeoutSeconds));
+            if(taskId is not null && ledger is not null)await ledger.ClaimAsync(actor.UserId,taskId,name,args,ct);
             var data = await tool.Handler.ExecuteAsync(actor, name, args, timeout.Token);
+            if(taskId is not null && ledger is not null)await ledger.CompleteAsync(actor.UserId,taskId,name,args,new("success",data),CancellationToken.None);
+            if(permission == Permission.Notify && events is not null)await events.SendAsync(actor.UserId,"activity",new{tool=name,status="completed"},ct);
             status = "success"; return new(status, data);
         }
         catch (OperationCanceledException) { status = "cancelled"; throw; }

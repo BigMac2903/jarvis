@@ -35,6 +35,8 @@ with sync_playwright() as p:
         if path=='/setup/status':data={'required':False}
         elif path=='/auth/me':data={'user':{'username':'Testnutzer','id':'ui-fixture'},'csrf':'test-only'}
         elif path=='/settings':data={}
+        elif path=='/phone/sip/status':data={'accounts':[{'id':'test','name':'Testkonto','registered':False,'state':'Not registered','activeCalls':0,'lastAttempt':None}]}
+        elif path=='/memory/personal':data=[{'id':'test','category':'Preferences','fact':'Ich bevorzuge Termine am Vormittag.','source':'UI fixture','sensitive':False,'updated_at':'2026-09-25T10:00:00Z'}]
         route.fulfill(content_type='application/json',body=json.dumps(data))
     page.route('**/api/v1/**',fixture)
     page.route('**/health/ready',lambda r:r.fulfill(content_type='application/json',body='{"status":"ok"}'))
@@ -50,7 +52,14 @@ with sync_playwright() as p:
     page.wait_for_timeout(350)
     page.screenshot(path=str(out/'research-mobile.png'),full_page=True)
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'research mobile overflow'
+    for button, heading, slug in [('Tasks & Goals','Ziele statt Mikrobefehle','tasks'),('Memory','Persönliches Gedächtnis','memory'),('AI Models','Modelle & Verbrauch','models'),('Phone','SIP-Telefonie','sip')]:
+        page.get_by_role('button',name='Menü',exact=True).click()
+        page.get_by_role('button',name=button,exact=True).click()
+        page.get_by_role('heading',name=heading,exact=True).wait_for()
+        page.wait_for_timeout(150)
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), slug+' mobile overflow'
+        page.screenshot(path=str(out/(slug+'-mobile.png')),full_page=True)
     assert not errors, errors
     browser.close()
 server.shutdown()
-print('PASS: setup/dashboard/research rendering, responsive widths, no uncaught UI errors (explicit API fixtures; not backend integration)')
+print('PASS: setup/dashboard/research/tasks/memory/models/SIP rendering, responsive widths, no uncaught UI errors (explicit API fixtures; not backend integration)')

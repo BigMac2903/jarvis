@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 namespace Jarvis.Domain;
 public enum Risk { Safe, Confirm, AlwaysConfirm }
-public enum Permission { Allow, Ask, Deny }
+public enum Permission { Allow, Ask, Deny, Auto, Notify, AlwaysConfirm }
 public record Actor(string UserId, string? DeviceId = null);
 public record Field(string Type, string Description, bool Required = true, int MaxLength = 10000, string[]? Choices = null);
 public record ToolDefinition(string Name, string Description, Risk Risk, Dictionary<string, Field> Fields, int TimeoutSeconds = 30)
@@ -46,4 +46,5 @@ public interface IAuthorizationStore
     Task AuditAsync(string owner, string tool, string status, long milliseconds, string? approval, JsonObject args, CancellationToken ct);
 }
 public interface IEventSink { Task SendAsync(string owner, string topic, object data, CancellationToken ct); }
+public interface IAutonomyPolicy { Task<Permission?> ResolveAsync(string owner, ToolDefinition tool, Permission? permission, CancellationToken ct); }
 public class JarvisException(string message, int status = 400) : Exception(message) { public int Status { get; } = status; }

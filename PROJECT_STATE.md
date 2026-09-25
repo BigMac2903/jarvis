@@ -1,6 +1,6 @@
 # JARVIS Projektstand
 
-Arbeitsphase: Implementierter Quellstand mit abgeschlossener lokaler Prüfserie am 25.09.2026. Das Gesamtziel ist noch NICHT vollständig umgesetzt oder abgenommen. Nächste Phase: echte Docker-/Datenbank-Abnahme und verbleibende Funktionen aus docs/STATUS.md.
+Arbeitsphase: Erweiterung um Anforderungen 61–200 am 25.09.2026; lokale Prüfserie und Dokumentation aktualisiert. Das Gesamtziel ist noch NICHT vollständig umgesetzt oder abgenommen. Neu im Quellstand: separater SIP-Dienst, G.711-Realtime-Brücke, Nextcloud/Immich, verschlüsselte strukturierte Erinnerungen mit Importvorschau, Modell-/Budgetsteuerung, persistente Aufgaben/Ziele und Ereignisregeln. Nächste Phase: echte Docker-/Datenbank-/Provider-Abnahme und fehlende Funktionen aus docs/REQUIREMENTS-61-200.md.
 
 ## Architektur
 
@@ -21,11 +21,11 @@ Arbeitsphase: Implementierter Quellstand mit abgeschlossener lokaler Prüfserie 
 Erfolgreich:
 
 - Gesamte .NET-Solution als Release einschließlich Windows-Agent: 0 Fehler, 0 Warnungen.
-- 16 .NET-Unit-/Security-Tests; 1 echter API-/Datenbanktest ausdrücklich übersprungen.
+- 39 .NET-Tests einschließlich vier echter lokaler SIP-/RTP-/SRTP-Verbindungen (PCMU/PCMA und DTMF); 1 echter API-/Datenbanktest ausdrücklich übersprungen.
 - TypeScript-/Vite-Produktionsbuild. Zwei harmlose Rollup-Hinweise zu Kommentar-Annotationen im SignalR-Paket.
 - Acht Python-Tests: DNS/SSRF und echte PDF-Parserprozesse (Text, OCR-Hinweis bei leerer Seite, Ablehnung ungültiger Inhalte).
-- Echter Chromium-Smoke-Test: öffentlicher HTTPS-Abruf über Egress-Proxy, Navigation, Text, Titel, Screenshot und Tabs; fehlende Authentifizierung, private Zieladressen und file-URLs abgewiesen.
-- Desktop-/Mobil-UI-Test für Setup, Dashboard und Recherche, ohne horizontales Überlaufen oder unbehandelte JavaScript-Fehler. Dieser Test verwendet explizite API-Fixtures, keine echte Datenbank. Screenshots visuell geprüft, primären Buttonkontrast korrigiert.
+- Echter Chromium-Smoke-Test: öffentlicher HTTPS-Abruf über Egress-Proxy, Navigation, Text, Titel, Screenshot und Tabs; fehlende Authentifizierung, private Zieladressen und file-URLs abgewiesen. Neuer authentifizierter binärer PDF-Endpunkt ebenfalls mit echtem Parser geprüft.
+- Desktop-/Mobil-UI-Test für Setup, Dashboard, Recherche, Aufgaben/Ziele, persönliches Memory, Modelle und SIP, ohne horizontales Überlaufen oder unbehandelte JavaScript-Fehler. Dieser Test verwendet explizite API-Fixtures, keine echte Datenbank. Screenshots visuell geprüft.
 - Compose-Konfiguration mit allen optionalen Profilen validiert; PowerShell-Skripte syntaktisch geprüft.
 - npm Produktionsabhängigkeiten, .NET-Pakete und installierte Python-Pakete ohne gemeldete bekannte Schwachstellen zum Prüfzeitpunkt. Keine Garantie vollständiger Sicherheitsfehlerfreiheit.
 
@@ -41,6 +41,8 @@ Browser-Python-Pakete wurden in einer separaten portablen x64-Python-Umgebung in
 - Swift-Build auf macOS und reale native Desktop-Steuerung prüfen.
 - Provider-Verbindungstests mit vom Benutzer eingetragenen Konten ausführen; keine Kosten verursachenden Calls automatisch ausführen.
 - Fehlende Varianten sind in docs/STATUS.md ausdrücklich aufgelistet: u. a. CalDAV/IMAP, lokale STT/TTS, native Mikrofonaufnahme, OCR, Web Push bei geschlossenem Browser, Wakeword, automatischer verbindlicher Telefon-Buchungsabschluss und vollständiger Containerlog-Aggregator. Sie sind nicht als implementiert zu verstehen.
+- Neue Grenzen: semantische Memory-Konfliktanalyse, Tagesbriefing/Timeline, vollständige Connector-Watcher, Qualitätsbenchmarks/lernendes Routing, Audio-/Telefonkostenjournal, autonome IVR/Voicemail sowie unabhängige Zielverifikation fehlen. Details in docs/REQUIREMENTS-61-200.md.
+- Bei KI-Hard-Limit ist Realtime vorsorglich gesperrt. SIP-Bibliothek hat zusätzliche Nutzungsbeschränkung; Originaltext unter docs/licenses/SIPSorcery.txt. Keine uneingeschränkt BSD-lizenzierte SIP-Gesamtanwendung behaupten.
 
 ## Reproduzierbare Prüfungen
 
@@ -60,6 +62,6 @@ Ein Administrator, eine API-Replik. Geheimnisse bleiben im Vault; Browser besitz
 
 ## Dateistruktur
 
-src/Jarvis.Domain, Jarvis.Application, Jarvis.Infrastructure, Jarvis.Agent, Jarvis.Api, Jarvis.Web; agents/windows, macos, ios; services/browser; docker; scripts; tests; docs; .github/workflows.
+src/Jarvis.Domain, Jarvis.Application, Jarvis.Infrastructure, Jarvis.Agent, Jarvis.Api, Jarvis.Web; agents/windows, macos, ios; services/browser und services/sip; docker; scripts; tests; docs; .github/workflows.
 
 Diese Datei vor jeder neuen Arbeitsphase zuerst lesen. Funktionierende Architektur nicht ohne Grund wechseln.

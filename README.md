@@ -2,6 +2,8 @@
 
 Ein persönlicher, lokal selbst hostbarer KI-Assistent mit Chat, Sprache, Recherche, Quellen, freigegebenen Geräten und bestätigten Aktionen.
 
+Neu: SIP als Standardtelefonie, Nextcloud/Immich, verschlüsseltes persönliches Memory mit Importvorschau, Aufgaben/Ziele, Ereignisregeln sowie Modellregistry und Budgetjournal. Einrichtung: [SIP](docs/SIP.md) und [Operator/Konnektoren/Modelle](docs/OPERATOR.md). Die [Matrix 61–200](docs/REQUIREMENTS-61-200.md) nennt ausdrücklich auch noch fehlende Anforderungen.
+
 **Prüfstand:** Quellcode, lokale Builds, Sicherheitsprüfungen und ein echter Chromium-Smoke-Test sind vorhanden. Auf dem Entwicklungsrechner fehlt die Docker-Engine; der vollständige Containerstart und die PostgreSQL-/Redis-Integration sind dort noch nicht abgenommen. Dies ist keine Behauptung eines fertig geprüften Produktivsystems. Details und verbleibende Grenzen stehen in [PROJECT_STATE.md](PROJECT_STATE.md) und [Funktionsstatus](docs/STATUS.md).
 
 ## 1. Was du brauchst
@@ -10,9 +12,9 @@ Ein persönlicher, lokal selbst hostbarer KI-Assistent mit Chat, Sprache, Recher
 - Als Ausgangspunkt ungefähr 4 CPU-Kerne, 8 GB RAM und 15 GB freien Speicher. Lokale KI benötigt je nach Modell deutlich mehr RAM/VRAM.
 - Für Cloud-KI ein Konto beim gewählten Anbieter und einen API-Key. Das ChatGPT-Abonnement ersetzt keinen API-Key.
 - Für Kalender, Mail und Telefonie jeweils eigene Zugangsdaten. Du kannst diese Funktionen zunächst deaktiviert lassen.
-- Für Mikrofon, Kamera, Geräte-Agenten und OAuth eine vertrauenswürdige HTTPS-Adresse. Öffentlich erreichbare Telefonie braucht eine Domain, die Twilio erreichen kann.
+- Für Mikrofon, Kamera, Geräte-Agenten und OAuth eine vertrauenswürdige HTTPS-Adresse. SIP braucht eine erreichbare PBX und passende SIP-/RTP-Netzkonfiguration; nur der optionale Twilio-Pfad braucht eine öffentlich erreichbare Webhook-Domain.
 
-JARVIS veröffentlicht nur die Ports 80 und 443 des Reverse Proxys. Datenbank, Redis und Browser besitzen keine veröffentlichten Hostports.
+Der Basis-Stack veröffentlicht nur Ports 80 und 443 des Reverse Proxys. Datenbank, Redis und Browser besitzen keine veröffentlichten Hostports. Der ausdrücklich aktivierte SIP-Portoverride ergänzt SIP/RTP; die Hostfirewall muss diese auf PBX-/Medienpeers begrenzen.
 
 ## 2. Repository verwenden
 
@@ -126,11 +128,13 @@ Unter Calendar stehen Lesen, Verfügbarkeit, Anlegen, Ändern und Löschen zur V
 
 Mail nutzt die verbundenen Google-/Microsoft-Konten. Suche, Lesen, Entwurf und Versand sind implementiert. Entwürfe und Versand werden standardmäßig bestätigt. Der Chat kann Kontaktdaten über Contacts.Search finden. IMAP/SMTP ist derzeit nicht enthalten.
 
-Twilio: Account SID, Auth Token, Twilio-Nummer und verifizierte Caller-ID unter Settings → Twilio speichern und testen. Die Testfunktion liest Nummern; sie tätigt keinen Anruf. PUBLIC_URL muss öffentlich per HTTPS erreichbar sein. Twilio erhält signierte Webhook-Endpunkte automatisch beim Anruf.
+Standard SIP: Dienstprofil aktivieren, Konto und Passwort im Vault konfigurieren, Registrierung testen und freigegebene Länder eintragen. Die vollständige Anleitung einschließlich NAT, Ports, SRTP und Grenzen steht in [docs/SIP.md](docs/SIP.md).
 
-Phone.Call erzeugt zuerst eine Freigabe mit Telefonnummer und Gesprächsauftrag. Erst nach Bestätigung wird ein kostenpflichtiger Anruf gestartet. Der Gesprächsbeginn bezeichnet JARVIS als digitalen Assistenten. Aufzeichnung ist ausgeschaltet. Gather verarbeitet Sprache und DTMF. Für Echtzeit-Streaming samt Unterbrechungen aktiviere nach entsprechender Twilio-Freischaltung „ConversationRelay Streaming“. Gesprächsergebnisse und Transkripte erscheinen unter Calls. Externe Terminänderungen werden anschließend über Calendar und eine eigene Freigabe ausgeführt.
+Optional Twilio: Unter Settings → Telefonie ausdrücklich `provider=twilio` wählen. Account SID, Auth Token, Twilio-Nummer und verifizierte Caller-ID unter Settings → Twilio speichern und testen. Die Testfunktion liest Nummern; sie tätigt keinen Anruf. PUBLIC_URL muss öffentlich per HTTPS erreichbar sein. Twilio erhält signierte Webhook-Endpunkte automatisch beim Anruf.
 
-Gespräche haben ein Limit von zehn Minuten. Verbindliche Zusagen werden nicht aus erfundenen Kalenderdaten abgeleitet. Prüfe ein angebotenes Zeitfenster vor der Kalenderfreigabe.
+Phone.Call erzeugt standardmäßig eine Freigabe mit Telefonnummer und Gesprächsauftrag. Audioaufzeichnung ist ausgeschaltet; Textprotokolle werden gespeichert. SIP nutzt die separate Realtime-Audiobrücke. Twilio Gather verarbeitet Sprache und DTMF; für Twilio-Streaming nach Freischaltung „ConversationRelay Streaming“ aktivieren. Gesprächsergebnisse erscheinen unter Calls. Externe Terminänderungen werden anschließend über Calendar und eine eigene Freigabe ausgeführt.
+
+Gespräche haben konfigurierbare Dauer-/Versuchslimits (maximale Dauer standardmäßig zehn Minuten, einzelner Auftrag standardmäßig fünf). Verbindliche Zusagen werden nicht aus erfundenen Kalenderdaten abgeleitet. Prüfe ein angebotenes Zeitfenster vor der Kalenderfreigabe.
 
 ## 10. Obsidian und Gedächtnis
 
@@ -140,7 +144,9 @@ Für Linux muss UID 1654 den Vault lesen können; Schreibzugriff erfordert passe
 
 Schreibzugriff ist zusätzlich im Dashboard schaltbar und benötigt pro Aktion die Capability-Freigabe. Nur Markdown innerhalb des Vaults ist erlaubt; Traversal und symbolische Links werden abgewiesen. Frontmatter kann als Bestandteil des Markdown gelesen und geschrieben werden. Tags und Wiki-Links werden beim Lesen extrahiert. Interne Erinnerungen bleiben getrennt in PostgreSQL.
 
-Semantische Suche: Embedding-Modell konfigurieren, dann Memory.Index anfragen und die Datenübertragung bestätigen. Es indexiert begrenzt viele Erinnerungen/Vaultdateien. Memory.Search kombiniert Textsuche mit Ähnlichkeitssuche. Veränderte oder gelöschte Dateien werden nicht aus einem veralteten Vektorindex zitiert; erneut indexieren.
+Persönliche Erinnerungen werden im neuen Memory-Editor verschlüsselt gespeichert. Importierte Benutzeraussagen bleiben bis zur Einzelprüfung Kandidaten; sensible Fakten werden nicht automatisch Modellkontext. Kategorien, Historie, Quellen und Grenzen der Legacy-Daten stehen in [docs/OPERATOR.md](docs/OPERATOR.md).
+
+Semantische Obsidian-Suche: Embedding-Modell konfigurieren, dann Memory.Index anfragen und die Datenübertragung bestätigen. Es indexiert begrenzt viele freigegebene Vaultdateien, keine unklassifizierten Legacy-Erinnerungen. Memory.Search kombiniert freigegebene persönliche Texttreffer mit Obsidian-Text-/Ähnlichkeitssuche. Veränderte oder gelöschte Dateien werden nicht aus einem veralteten Vektorindex zitiert; erneut indexieren.
 
 ## 11. Windows-Agent
 
@@ -193,13 +199,13 @@ Research bietet Quick Search, Research und Deep Research. Laufende Recherche kan
 
 Browser unterstützt Tabs, Texte, Links, Tabellen, Screenshots, Navigation und bestätigte Interaktionen. Zugangsdaten für Browser-Logins können über den authentifizierten Vault-Endpunkt hinterlegt werden, siehe [API](docs/API.md). Sie werden serverseitig eingesetzt und nicht an das Modell ausgegeben. Downloads bleiben in Quarantäne; keine automatische Ausführung oder Weitergabe. Für Antivirus COMPOSE_PROFILES um antivirus ergänzen und CLAMAV_HOST=clamav setzen. Ohne Scanner wird ausdrücklich scanned=false gemeldet.
 
-Permissions: Immer erlauben, jedes Mal fragen, sperren oder zehn Minuten erlauben. Browserklicks bleiben immer bestätigungspflichtig, weil der Server nicht zuverlässig erkennen kann, ob ein Klick einen Kauf oder eine Kontoveränderung auslöst. Freigaben sind einmalig und an Tool, Nutzer und Argumente gebunden. Audit speichert Feldnamen und Argument-Hash statt sensibler Inhalte.
+Permissions: Standard-Autonomiepolicy oder explizit AUTO/NOTIFY/ASK/ALWAYS_CONFIRM, erlauben, sperren oder zehn Minuten erlauben. Level 3 ist Standard, aber nur eine kleine reversible Allowlist wird ohne Einzelfrage mit Aktivitätsmeldung ausgeführt. Browserklicks bleiben immer bestätigungspflichtig, weil der Server nicht zuverlässig erkennen kann, ob ein Klick einen Kauf oder eine Kontoveränderung auslöst. Freigaben sind einmalig und an Tool, Nutzer und Argumente gebunden. Audit speichert Feldnamen und Argument-Hash statt sensibler Inhalte.
 
 Unter Settings MFA aktivieren. Dein Passwortmanager sollte zusätzlich den TOTP-Schlüssel und Wiederherstellungsinformationen verwahren. Bei Verlust ist eine administrative Offline-Wiederherstellung erforderlich; es gibt keine versteckte MFA-Umgehung.
 
 ## 15. Backup und Restore
 
-Windows: .\scripts\backup.ps1. Linux/macOS: bash scripts/backup.sh. Für einen konsistenten Stand werden API und Browser kurz gestoppt und anschließend auch bei Fehlern wieder gestartet. PostgreSQL, Konfiguration, Vault, API-Daten und Browserprofile werden nach backups/ZEITPUNKT kopiert. Das Backup enthält Schlüssel und private Informationen: offline verschlüsseln und separat aufbewahren.
+Windows: .\scripts\backup.ps1. Linux/macOS: bash scripts/backup.sh. Für einen konsistenten Stand werden ein laufender SIP-Dienst, API und Browser kurz gestoppt und anschließend auch bei Fehlern wieder gestartet; aktive Telefonate werden dabei beendet. PostgreSQL, Konfiguration, Vault, API-Daten und Browserprofile werden nach backups/ZEITPUNKT kopiert. Das Backup enthält Schlüssel und private Informationen: offline verschlüsseln und separat aufbewahren.
 
 Wiederherstellung, Sicherheitsregeln und Prüfung: [docs/OPERATIONS.md](docs/OPERATIONS.md).
 

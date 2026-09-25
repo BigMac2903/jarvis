@@ -25,6 +25,15 @@ async def main():
         async with proxy, service.lifespan(service.app):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=service.app), base_url="http://test") as client:
                 headers = {"X-Service-Token": os.environ["BROWSER_TOKEN"]}
+                sys.path.insert(0, str(root / "tests" / "browser"))
+                from test_pdf import document
+                pdf = document("Nextcloud PDF pipeline")
+                assert (await client.post("/parse-pdf", content=pdf)).status_code == 401
+                assert (await client.post("/parse-pdf", headers=headers, content=b"not PDF")).status_code == 415
+                parsed = await client.post("/parse-pdf", headers=headers, content=pdf)
+                assert parsed.status_code == 200, parsed.text
+                assert parsed.json()["pages"][0]["text"] == "Nextcloud PDF pipeline"
+                assert parsed.json()["untrusted"]
                 async def action(name, args, expected=200):
                     response = await client.post("/action", headers=headers, json={"owner":"smoke-user", "action":name, "args":args})
                     assert response.status_code == expected, (name, response.status_code, response.text)
@@ -42,7 +51,7 @@ async def main():
                 assert screenshot["image"].startswith("data:image/png;base64,")
                 await action("closetab", {"tab":tab})
                 await action("close", {})
-                print("PASS: authentication, private-network blocking, scheme validation, HTTPS fetch, real Chromium navigation/text/screenshot/tab lifecycle")
+                print("PASS: authenticated binary PDF parsing, authentication, private-network blocking, scheme validation, HTTPS fetch, real Chromium navigation/text/screenshot/tab lifecycle")
 
 if __name__ == "__main__":
     asyncio.run(main())

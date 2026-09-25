@@ -24,14 +24,14 @@ public sealed class PhoneService(Settings settings,Vault vault,IDocumentStore st
             var number=a["number"]!.GetValue<string>();if(!Regex.IsMatch(number,@"^\+[1-9]\d{6,14}$"))throw new JarvisException("E.164 Telefonnummer erforderlich.");
             var publicUrl=config["PUBLIC_URL"]!.TrimEnd('/');
             if(!publicUrl.StartsWith("https://")||new Uri(publicUrl).IsLoopback)throw new JarvisException("Telefonie benötigt eine öffentlich erreichbare HTTPS-Domain.",409);
-            var id=Guid.NewGuid().ToString("N");
-            var call=new JsonObject{["number"]=number,["objective"]=a["objective"]!.DeepClone(),["status"]="initiating",["recording"]=false,["transcript"]=new JsonArray()};
+            var id=a["callId"]?.GetValue<string>()??Guid.NewGuid().ToString("N");
+            var call=new JsonObject{["provider"]="twilio",["direction"]="outbound",["started_at"]=DateTimeOffset.UtcNow.ToString("O"),["number"]=number,["objective"]=a["objective"]!.DeepClone(),["status"]="initiating",["recording"]=false,["transcript"]=new JsonArray()};
             await store.PutAsync(actor.UserId,"calls",id,call,ct);
             var path="/api/v1/phone/webhook/"+actor.UserId+"/"+id;
             var result=await Request(actor.UserId,HttpMethod.Post,"Calls.json",new(){
                 ["To"]=number,["From"]=cfg["callerId"]?.GetValue<string>()??cfg["number"]?.GetValue<string>()??throw new JarvisException("Caller-ID fehlt."),
                 ["Url"]=publicUrl+path,["StatusCallback"]=publicUrl+path+"/status",["StatusCallbackEvent"]="completed",
-                ["Record"]="false",["Timeout"]="30",["TimeLimit"]="600"
+                ["Record"]="false",["Timeout"]="30",["TimeLimit"]=(a["max_duration"]?.GetValue<int>()??600).ToString()
             },ct);
             call["sid"]=result!["sid"]!.DeepClone();call["status"]=result["status"]!.DeepClone();
             await store.PutAsync(actor.UserId,"calls",id,call,ct);return new JsonObject{["callId"]=id,["status"]=call["status"]!.DeepClone()};

@@ -12,9 +12,7 @@ public sealed class SemanticMemory(IDocumentStore store,Settings settings,AiClie
         var model=cfg["embeddingModel"]?.GetValue<string>();
         if(string.IsNullOrWhiteSpace(model))throw new JarvisException("Embedding-Modell zuerst unter AI Models konfigurieren.",409);
         var indexed=0;
-        foreach(var memory in await store.ListAsync(owner,"memory",maxFiles,ct)){
-            var text=memory.Data.ToJsonString();await Index(owner,"memory",memory.Id,text,model,ct);indexed++;
-        }
+        // Legacy memories have no sensitivity classification. Never upload them implicitly.
         var vault=await settings.GetAsync(owner,"obsidian",ct);
         var root=config["OBSIDIAN_PATH"]??"/data/obsidian";
         if(vault["enabled"]?.GetValue<bool>()==true&&Directory.Exists(root))
@@ -50,7 +48,7 @@ public sealed class SemanticMemory(IDocumentStore store,Settings settings,AiClie
                 if(!File.Exists(path))continue;
                 if(new FileInfo(path).Length>1000000)continue;
                 if(Crypto.Hash(await File.ReadAllTextAsync(path,ct))!=data["hash"]!.GetValue<string>())continue;
-            }else if(await store.GetAsync(owner,"memory",id,ct) is not StoredDocument memory||Crypto.Hash(memory.Data.ToJsonString())!=data["hash"]!.GetValue<string>())continue;
+            }else continue;
             var other=JsonSerializer.Deserialize<double[]>(data["vector"]!.ToJsonString())!;
             if(other.Length!=vector.Length)continue;
             var dot=vector.Zip(other).Sum(p=>p.First*p.Second);var denominator=Math.Sqrt(vector.Sum(x=>x*x)*other.Sum(x=>x*x));
@@ -61,12 +59,6 @@ public sealed class SemanticMemory(IDocumentStore store,Settings settings,AiClie
     }
     private async Task<double[]> Embed(string owner,string input,string model,CancellationToken ct)
     {
-        var(client,_)=await ai.ClientAsync(owner,ct);using var dispose=client;
-        using var response=await client.PostAsJsonAsync("embeddings",new{model,input},ct);
-        if(!response.IsSuccessStatusCode)throw new JarvisException($"Embedding-Provider: HTTP {(int)response.StatusCode}",502);
-        var body=await response.Content.ReadFromJsonAsync<JsonObject>(ct);
-        var vector=JsonSerializer.Deserialize<double[]>(body!["data"]![0]!["embedding"]!.ToJsonString())!;
-        if(vector.Length is <1 or >10000||vector.Any(x=>!double.IsFinite(x)))throw new JarvisException("Ungültiges Embedding.",502);
-        return vector;
+        return await ai.EmbedAsync(owner,input,model,ct);
     }
 }

@@ -3,7 +3,8 @@ import {HubConnectionBuilder,LogLevel} from '@microsoft/signalr';
 import {Activity,ArrowUpRight,AudioLines,BookOpen,Calendar,Camera,Check,ChevronRight,Compass,Globe,Home,Layers,LogOut,Mail,Menu,MessageSquare,Mic,Monitor,Phone,Search,Send,Settings as SettingsIcon,Shield,Square,Terminal,Users,X} from 'lucide-react';
 import {api,Doc,errorText,setCsrf} from './api';
 import Auth from './Auth';import Settings from './Settings';import Voice from './Voice';import {Approvals,DataPanel,Permissions,ToolPanel} from './Panels';
-const nav=[['Home',Home],['Chat',MessageSquare],['Voice',AudioLines],['Research',Compass],['Browser',Globe],['Devices',Monitor],['Calendar',Calendar],['Mail',Mail],['Phone',Phone],['Calls',Phone],['Memory',BookOpen],['Obsidian',Layers],['Automations',Activity],['Contacts',Users],['AI Models',Terminal],['Freigaben',Check],['Permissions',Shield],['Audit Log',Activity],['System',Layers],['Settings',SettingsIcon]] as const;
+import {TaskBoard,PersonalMemoryPanel,ModelDashboard,SipStatus} from './OperatorPanels';
+const nav=[['Home',Home],['Chat',MessageSquare],['Voice',AudioLines],['Research',Compass],['Browser',Globe],['Devices',Monitor],['Tasks & Goals',Layers],['Nextcloud',BookOpen],['Immich',Camera],['Calendar',Calendar],['Mail',Mail],['Phone',Phone],['Calls',Phone],['Memory',BookOpen],['Obsidian',Layers],['Automations',Activity],['Contacts',Users],['AI Models',Terminal],['Freigaben',Check],['Permissions',Shield],['Audit Log',Activity],['Events',Activity],['System',Layers],['Settings',SettingsIcon]] as const;
 function safeUrl(url:string){try{const u=new URL(url);return ['http:','https:'].includes(u.protocol)?u.href:'#'}catch{return '#'}}
 export default function App(){
  const[ready,setReady]=useState(false),[setup,setSetup]=useState(false),[user,setUser]=useState<any>(),[page,setPage]=useState('Home'),[error,setError]=useState(''),[menu,setMenu]=useState(false);
@@ -13,7 +14,7 @@ export default function App(){
  useEffect(()=>{init()},[init]);
  useEffect(()=>{if(!user)return;refresh();fetch('/health/ready').then(r=>setHealth(r.ok)).catch(()=>setHealth(false));
   const hub=new HubConnectionBuilder().withUrl('/hubs/events').withAutomaticReconnect().configureLogging(LogLevel.Error).build();
-  ['research','tool','job','device','call','automation','notification'].forEach(topic=>hub.on(topic,e=>{setEvents(prev=>[e.message||[e.tool,e.status].filter(Boolean).join(' ')||topic,...prev].slice(0,12))}));
+  ['research','tool','job','device','call','automation','notification','task','event','activity'].forEach(topic=>hub.on(topic,e=>{setEvents(prev=>[e.message||[e.tool,e.status].filter(Boolean).join(' ')||topic,...prev].slice(0,12))}));
   hub.on('notification',e=>{if('Notification' in window&&Notification.permission==='granted')new Notification(e.title,{body:e.message})});
   hub.start().catch(()=>setEvents(['Live-Verbindung unterbrochen. Manuelles Aktualisieren ist verfügbar.']));
   const timer=setInterval(refresh,30000);const renew=setInterval(()=>api('/auth/refresh','POST',{}).then(r=>setCsrf(r.csrf)).catch(()=>setUser(null)),30*60*1000);
@@ -33,15 +34,16 @@ export default function App(){
  {page==='Chat'&&<Chat/>}{page==='Voice'&&<Voice/>}{page==='Research'&&<><Research events={events}/><DataPanel kind="research" title="Gesamter Rechercheverlauf"/></>}
  {page==='Browser'&&<><p className="notice">Öffne einen Tab, nutze dessen ID für weitere Aktionen und fordere einen Screenshot an. Klicks und Formulare benötigen eine Freigabe.</p><ToolPanel prefix="Web."/><ToolPanel prefix="Browser."/></>}
  {page==='Devices'&&<Devices devices={devices} refresh={refresh}/>}
- {page==='Calendar'&&<ToolPanel prefix="Calendar."/>}{page==='Mail'&&<ToolPanel prefix="Mail."/>}{page==='Phone'&&<ToolPanel prefix="Phone."/>}
+ {page==='Calendar'&&<ToolPanel prefix="Calendar."/>}{page==='Mail'&&<ToolPanel prefix="Mail."/>}{page==='Phone'&&<><SipStatus/><ToolPanel prefix="Phone."/></>}
  {page==='Calls'&&<DataPanel kind="calls" title="Gespräche & Ergebnisse"/>}
- {page==='Memory'&&<><ToolPanel prefix="Memory."/><DataPanel kind="memory" title="Langzeitgedächtnis"/></>}
+ {page==='Memory'&&<><PersonalMemoryPanel/><ToolPanel prefix="Memory."/><DataPanel kind="memory" title="Legacy-Erinnerungen (nicht verschlüsselt; manuell übernehmen)"/></>}
  {page==='Obsidian'&&<><ToolPanel prefix="File."/><Settings initial="obsidian"/></>}
  {page==='Automations'&&<DataPanel kind="automations" title="Automationen"/>}{page==='Contacts'&&<DataPanel kind="contacts" title="Kontakte"/>}
  {page==='Freigaben'&&<Approvals onChange={refresh}/>} {page==='Permissions'&&<Permissions/>}
  {page==='Audit Log'&&<section className="panel"><h2>Audit Log</h2><div className="tablewrap"><table><thead><tr><th>Zeit</th><th>Tool</th><th>Ergebnis</th><th>Dauer</th></tr></thead><tbody>{audit.map(a=><tr key={a.id}><td>{new Date(a.created_at).toLocaleString()}</td><td>{a.tool}</td><td>{a.status}</td><td>{a.duration_ms} ms</td></tr>)}</tbody></table></div></section>}
- {(page==='Settings'||page==='AI Models')&&<Settings initial="ai"/>}
+ {page==='Settings'&&<Settings initial="ai"/>}{page==='AI Models'&&<><ModelDashboard/><Settings initial="ai"/></>}
  {page==='System'&&<><section className="panel"><h2>Systemzustand</h2><BrowserNotifications/><p>API, PostgreSQL, Redis und Migration: {health?'erreichbar / erfolgreich':'noch nicht bestätigt'}</p><p className="muted">Detaillierte Containerprüfungen: scripts/verify-installation.ps1 oder scripts/verify-installation.sh auf deinem Server.</p><a href="/openapi/v1.json" target="_blank" rel="noreferrer">OpenAPI-Spezifikation öffnen</a></section><DataPanel kind="tasks" title="Aufgaben"/></>}
+ {page==='Tasks & Goals'&&<TaskBoard/>}{page==='Nextcloud'&&<ToolPanel prefix="Nextcloud."/>}{page==='Immich'&&<ToolPanel prefix="Immich."/>}{page==='Events'&&<><DataPanel kind="events" title="Ereignisse"/><DataPanel kind="event-rules" title="Ereignisregeln"/></>}
  </main><footer>JARVIS <span>Self-hosted personal intelligence</span><span>Keine Telemetrie.</span></footer></div></div>
 }
 function Metric({label,value,text,icon}:{label:string;value:string|number;text:string;icon:React.ReactNode}){return <section className="metric"><div>{icon}<span>{label}</span></div><strong>{value}</strong><small>{text}</small></section>}

@@ -13,7 +13,7 @@ public sealed class AuthorizationStore(Database db) : IAuthorizationStore
     public async Task<string> RequestAsync(string owner, string tool, JsonObject args, CancellationToken ct)
     {
         var id = Guid.NewGuid().ToString("N");
-        await db.ExecuteAsync("INSERT INTO approvals(id,owner,tool,args) VALUES($1,$2,$3,$4::jsonb)", ct, id, owner, tool, args.ToJsonString()); return id;
+        await db.ExecuteAsync("INSERT INTO approvals(id,owner,tool,args,task_id) VALUES($1,$2,$3,$4::jsonb,$5)", ct, id, owner, tool, args.ToJsonString(),(object?)ExecutionScope.TaskId??DBNull.Value); return id;
     }
     public async Task<bool> ConsumeAsync(string owner, string id, string tool, JsonObject args, CancellationToken ct) =>
         await db.ExecuteAsync("UPDATE approvals SET state='consumed' WHERE id=$1 AND owner=$2 AND tool=$3 AND args=$4::jsonb AND state='approved' AND expires_at>now()", ct, id, owner, tool, args.ToJsonString()) == 1;

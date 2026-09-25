@@ -1,0 +1,9 @@
+# Explicit opt-in: SIP/RTP requires extra UDP ports unlike the HTTPS-only core.
+# Restrict these at the HOST FIREWALL to your PBX/media peers. Never expose SIP to the whole Internet.
+services:
+  jarvis-sip:
+    ports:
+      - "${SIP_BIND_ADDRESS:-127.0.0.1}:5060:5060/udp"
+      - "${SIP_BIND_ADDRESS:-127.0.0.1}:5060:5060/tcp"
+      - "${SIP_BIND_ADDRESS:-127.0.0.1}:5061:5061/tcp"
+      - "${SIP_BIND_ADDRESS:-127.0.0.1}:20000-20099:20000-20099/udp"

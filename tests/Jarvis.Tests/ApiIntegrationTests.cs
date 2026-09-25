@@ -42,13 +42,14 @@ public class ApiIntegrationTests
         var noCsrf=await client.PostAsJsonAsync("/api/v1/tools/execute",new{name="Memory.Write",args=new{title="Secret",text="Persistent content"}});
         Assert.Equal(HttpStatusCode.Forbidden,noCsrf.StatusCode);
         client.DefaultRequestHeaders.Add("Origin","https://localhost");client.DefaultRequestHeaders.Add("X-CSRF-Token",csrf);
+        Assert.Equal(HttpStatusCode.OK,(await client.PutAsJsonAsync("/api/v1/permissions/Memory.Write",new{permission="Ask"})).StatusCode);
         var action=await client.PostAsJsonAsync("/api/v1/tools/execute",new{name="Memory.Write",args=new{title="Test",text="Persistent content"}});
         var pending=(await action.Content.ReadFromJsonAsync<JsonObject>())!;
         Assert.Equal("approval_required",pending["status"]!.GetValue<string>());
         var id=pending["approvalId"]!.GetValue<string>();
         var approved=await client.PostAsJsonAsync("/api/v1/approvals/"+id,new{approve=true});Assert.Equal(HttpStatusCode.OK,approved.StatusCode);
         var duplicate=await client.PostAsJsonAsync("/api/v1/approvals/"+id,new{approve=true});Assert.Equal(HttpStatusCode.Conflict,duplicate.StatusCode);
-        var memories=await client.GetFromJsonAsync<JsonArray>("/api/v1/data/memory");Assert.Single(memories!);
+        var memories=await client.GetFromJsonAsync<JsonArray>("/api/v1/memory/personal");Assert.Single(memories!);
         var pairingResponse=await client.PostAsJsonAsync("/api/v1/devices/pairing",new{});var pairing=(await pairingResponse.Content.ReadFromJsonAsync<JsonObject>())!;
         using var device=factory.CreateClient(new WebApplicationFactoryClientOptions{BaseAddress=new Uri("https://localhost"),HandleCookies=false});
         var paired=await device.PostAsJsonAsync("/api/v1/devices/pair",new{token=pairing["token"]!.GetValue<string>(),code=pairing["code"]!.GetValue<string>(),name="Unit device",platform="ios"});

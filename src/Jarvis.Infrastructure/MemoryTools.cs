@@ -3,12 +3,12 @@ using System.Text.RegularExpressions;
 using Jarvis.Domain;
 using Microsoft.Extensions.Configuration;
 namespace Jarvis.Infrastructure;
-public sealed class MemoryTools(IDocumentStore store, Settings settings, IConfiguration config, SemanticMemory semantic) : IToolHandler
+public sealed class MemoryTools(Settings settings, IConfiguration config, SemanticMemory semantic, PersonalMemory personal) : IToolHandler
 {
     public IReadOnlyList<ToolDefinition> Definitions { get; } = [
         new("Memory.Index", "Semantischen Index aktualisieren. Überträgt freigegebene Texte an den konfigurierten Embedding-Provider.", Risk.Confirm, new() { ["maxFiles"] = new("integer", "Maximale Anzahl Dateien (1–500)", false) }, 600),
         new("Memory.Search", "Interne Erinnerungen und freigegebenen Obsidian-Vault durchsuchen.", Risk.Safe, new() { ["query"] = new("string", "Suchbegriff", MaxLength: 500) }),
-        new("Memory.Write", "Eine langfristige Erinnerung speichern.", Risk.Confirm, new() { ["title"] = new("string", "Titel", MaxLength: 200), ["text"] = new("string", "Inhalt", MaxLength: 50000) }),
+        new("Memory.Write", "Eine verschlüsselte sensible Erinnerung speichern. Automatische Modellkontexte bleiben ausgeschlossen.", Risk.Confirm, new() { ["title"] = new("string", "Titel", MaxLength: 200), ["text"] = new("string", "Inhalt", MaxLength: 10000) }),
         new("File.Read", "Markdown-Datei im Obsidian-Vault lesen.", Risk.Safe, new() { ["path"] = new("string", "Relativer Markdown-Pfad", MaxLength: 400) }),
         new("File.Write", "Markdown-Datei im Obsidian-Vault schreiben. Überschreibt den angegebenen Pfad.", Risk.Confirm, new() { ["path"] = new("string", "Relativer Markdown-Pfad", MaxLength: 400), ["text"] = new("string", "Markdown einschließlich optionalem Frontmatter", MaxLength: 100000) })
     ];
@@ -31,13 +31,18 @@ public sealed class MemoryTools(IDocumentStore store, Settings settings, IConfig
     {
         var owner = actor.UserId;
         if(name=="Memory.Index")return await semantic.IndexAsync(owner,Math.Clamp(a["maxFiles"]?.GetValue<int>()??100,1,500),ct);
-        if (name == "Memory.Write") { var id = Guid.NewGuid().ToString("N"); await store.PutAsync(owner, "memory", id, a, ct); return new JsonObject { ["id"] = id }; }
+        if (name == "Memory.Write") {
+            var id = Guid.NewGuid().ToString("N");
+            await personal.SaveAsync(owner, id, new() { ["fact"] = a["text"]!.DeepClone(), ["title"] = a["title"]!.DeepClone(),
+                ["category"] = "Other", ["source"] = "Explizite Memory.Write-Aktion", ["sensitive"] = true, ["confidence"] = 1 }, ct);
+            return new JsonObject { ["id"] = id, ["encrypted"] = true, ["sensitive"] = true };
+        }
         var cfg = await settings.GetAsync(owner, "obsidian", ct);
         var root = config["OBSIDIAN_PATH"] ?? "/data/obsidian";
         if (name == "Memory.Search")
         {
             var q = a["query"]!.GetValue<string>();
-            var matches = new JsonArray((await store.ListAsync(owner, "memory", 1000, ct)).Where(d => d.Data.ToJsonString().Contains(q, StringComparison.OrdinalIgnoreCase)).Take(30).Select(d => (JsonNode?)new JsonObject { ["id"] = d.Id, ["data"] = d.Data.DeepClone() }).ToArray());
+            var matches = (await personal.ExecuteAsync(actor, "Memory.PersonalSearch", a, ct))!.AsArray();
             foreach(var match in await semantic.SearchAsync(owner,q,ct))if(match is not null)matches.Add(match.DeepClone());
             if (cfg["enabled"]?.GetValue<bool>() == true && Directory.Exists(root))
                 foreach (var file in Directory.EnumerateFiles(root, "*.md", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint }).Take(3000))

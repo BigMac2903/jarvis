@@ -16,7 +16,7 @@ from urllib.parse import urljoin, urlsplit
 import httpx
 from bs4 import BeautifulSoup
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from playwright.async_api import async_playwright
 
@@ -28,6 +28,7 @@ sessions = {}
 locks = {}
 engine = None
 browser = None
+pdf_slots = asyncio.Semaphore(2)
 
 def validate_url(value: str) -> str:
     if not isinstance(value, str) or len(value) > 4096 or any(ord(c) < 32 for c in value):
@@ -132,6 +133,13 @@ async def fetch(url, maximum):
 
 def extract(url, body):
     soup = BeautifulSoup(body, "html.parser")
+    structured = []
+    for script in soup.select('script[type="application/ld+json"]')[:20]:
+        try:
+            if len(script.get_text()) <= 50000:
+                structured.append(json.loads(script.get_text()))
+        except (ValueError, TypeError):
+            pass
     title = soup.title.get_text(" ", strip=True) if soup.title else urlsplit(url).hostname
     metadata = {m.get("name", m.get("property")): m.get("content") for m in soup.select("meta[name],meta[property]")}
     for el in soup.select("script,style,noscript,nav,footer,header,aside,[role=banner],[role=navigation],.cookie-banner,.advertisement"):
@@ -140,7 +148,7 @@ def extract(url, body):
     links = [{"text": a.get_text(" ", strip=True)[:300], "url": urljoin(url, a["href"])} for a in content.select("a[href]") if urljoin(url, a["href"]).startswith(("https://", "http://"))]
     tables = [[[cell.get_text(" ", strip=True) for cell in row.select("th,td")] for row in table.select("tr")][:200] for table in content.select("table")][:30]
     return {"url": url, "domain": urlsplit(url).hostname, "title": title, "text": content.get_text("\n", strip=True)[:160000],
-            "links": links[:300], "tables": tables, "metadata": metadata,
+            "links": links[:300], "tables": tables, "metadata": metadata, "structured_data": structured,
             "published_at": metadata.get("article:published_time"), "retrieved_at": datetime.now(timezone.utc).isoformat(),
             "content_hash": hashlib.sha256(body).hexdigest(), "untrusted": True}
 
@@ -277,3 +285,29 @@ async def action(req: Action, x_service_token: str = Header(default="")):
     except Exception as exc:
         # Never return Playwright exceptions: they can include selectors, field values or credentials.
         raise HTTPException(422, "Browser operation failed validation, timed out, or could not complete") from None
+
+@app.post("/parse-pdf")
+async def parse_pdf(request: Request, x_service_token: str = Header(default="")):
+    if not SERVICE_TOKEN or not hmac.compare_digest(x_service_token, SERVICE_TOKEN):
+        raise HTTPException(401)
+    data = bytearray()
+    async for chunk in request.stream():
+        data.extend(chunk)
+        if len(data) > 10_000_000:
+            raise HTTPException(413)
+    if not data.startswith(b"%PDF-"):
+        raise HTTPException(415)
+    async with pdf_slots:
+        proc = await asyncio.create_subprocess_exec(sys.executable, str(Path(__file__).with_name("pdf_worker.py")),
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        try:
+            output, _ = await asyncio.wait_for(proc.communicate(bytes(data)), 60)
+            if proc.returncode != 0:
+                raise HTTPException(422)
+            return {**json.loads(output), "untrusted": True}
+        except asyncio.TimeoutError:
+            raise HTTPException(422, "PDF parser timeout") from None
+        finally:
+            if proc.returncode is None:
+                proc.kill()
+                await proc.wait()

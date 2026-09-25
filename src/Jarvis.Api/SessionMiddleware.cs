@@ -6,6 +6,11 @@ public sealed class SessionMiddleware(RequestDelegate next)
     public async Task InvokeAsync(HttpContext ctx,Database db,IConfiguration config)
     {
         var path=ctx.Request.Path.Value??"";
+        if(path.StartsWith("/internal/sip/",StringComparison.Ordinal)) {
+            var token=config["SIP_SERVICE_TOKEN"]??"";
+            if(token.Length<32||!Crypto.EqualsSecret(ctx.Request.Headers["X-Service-Token"].ToString(),token))throw new JarvisException("Dienstauthentifizierung erforderlich.",401);
+            await next(ctx);return;
+        }
         var anonymous=path.StartsWith("/health/")||path=="/api/v1/setup/status"||path=="/api/v1/setup"||path=="/api/v1/auth/login"||
             path=="/api/v1/devices/pair"||(path.StartsWith("/api/v1/oauth/")&&path.EndsWith("/callback"))||path.StartsWith("/api/v1/phone/webhook/")||path.StartsWith("/api/v1/phone/relay/")||path.StartsWith("/api/v1/automation-webhooks/");
         if(anonymous) { await next(ctx); return; }

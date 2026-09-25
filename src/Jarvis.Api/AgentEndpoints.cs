@@ -31,6 +31,7 @@ public static class AgentEndpoints
         });
         app.MapPost("/api/v1/voice/session",async(HttpContext ctx,AiClient ai,Settings settings,CancellationToken ct)=>{
             await settings.RequireAsync(ctx.Owner(),"voice",ct);
+            await ModelRouter.GuardRealtimeBudgetAsync(settings,ctx.Owner(),ct);
             using var reader=new StreamReader(ctx.Request.Body);var sdp=await reader.ReadToEndAsync(ct);
             if(sdp.Length>100000||!sdp.StartsWith("v="))throw new JarvisException("Ungültiges SDP.");
             var(client,cfg)=await ai.ClientAsync(ctx.Owner(),ct);using var dispose=client;

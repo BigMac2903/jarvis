@@ -5,7 +5,7 @@ using Jarvis.Domain;
 namespace Jarvis.Infrastructure;
 public record AiTurn(string Text, JsonArray Output, IReadOnlyList<AiCall> Calls);
 public record AiCall(string Id, string Name, JsonObject Arguments);
-public sealed partial class AiClient(IHttpClientFactory factory, Settings settings, Vault vault)
+public sealed partial class AiClient(IHttpClientFactory factory, Settings settings, Vault vault, ModelRouter router)
 {
     public async Task<(HttpClient Client, JsonObject Config)> ClientAsync(string owner, CancellationToken ct)
     {
@@ -19,35 +19,43 @@ public sealed partial class AiClient(IHttpClientFactory factory, Settings settin
     }
     public async Task<AiTurn> TurnAsync(string owner, string instructions, JsonArray input, IReadOnlyList<ToolDefinition> tools, CancellationToken ct, bool vision = false)
     {
+        var cfg = await settings.GetAsync(owner, "ai", ct);
+        var text = input.ToJsonString();
+        var choices = await router.ChooseAsync(owner, text, (instructions.Length + text.Length) / 3, tools.Count, vision, cfg, ct);
+        for (var index = 0; index < choices.Count; index++) {
+            try { return await TurnSelectedAsync(owner, instructions, input, tools, choices[index], ct); }
+            catch (JarvisException e) when (e.Status == 502 && index + 1 < choices.Count) { /* Equivalent validated fallback, bounded to three providers' model attempts. */ }
+        }
+        throw new JarvisException("Kein Modell verfügbar.", 502);
+    }
+    private async Task<AiTurn> TurnSelectedAsync(string owner, string instructions, JsonArray input, IReadOnlyList<ToolDefinition> tools, ModelChoice choice, CancellationToken ct)
+    {
         var (client, cfg) = await ClientAsync(owner, ct); using var dispose = client;
-        var model = cfg[vision ? "visionModel" : "model"]?.GetValue<string>();
+        var model = choice.Model;
         if (string.IsNullOrWhiteSpace(model)) throw new JarvisException("Bitte zuerst ein KI-Modell konfigurieren.", 409);
         var compatible = cfg["protocol"]?.GetValue<string>() == "chat";
         JsonObject payload;
         if (compatible)
         {
             var messages = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = instructions } };
-            foreach (var item in input)
-            {
-                if (item?["type"]?.GetValue<string>() == "function_call")
-                    messages.Add(new JsonObject { ["role"] = "assistant", ["content"] = null, ["tool_calls"] = new JsonArray(new JsonObject {
-                        ["id"] = item["call_id"]!.DeepClone(), ["type"] = "function",
-                        ["function"] = new JsonObject { ["name"] = item["name"]!.DeepClone(), ["arguments"] = item["arguments"]!.DeepClone() } }) });
-                else if (item?["type"]?.GetValue<string>() == "function_call_output")
-                    messages.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = item["call_id"]!.DeepClone(), ["content"] = item["output"]!.DeepClone() });
-                else if (item?["role"] is not null) messages.Add(item.DeepClone());
-            }
-            payload = new JsonObject { ["model"] = model, ["messages"] = messages };
+            foreach (var item in CompatibleMessages(input)) messages.Add(item!.DeepClone());
+            payload = new JsonObject { ["model"] = model, ["messages"] = messages, [choice.ReasoningEffort is null ? "max_tokens" : "max_completion_tokens"] = choice.OutputTokens };
+            if(choice.ReasoningEffort is not null)payload["reasoning_effort"] = choice.ReasoningEffort;
             if (tools.Count > 0) payload["tools"] = new JsonArray(tools.Select(t => (JsonNode?)new JsonObject { ["type"] = "function", ["function"] = Function(t) }).ToArray());
         }
         else
         {
-            payload = new JsonObject { ["model"] = model, ["instructions"] = instructions, ["input"] = input.DeepClone(), ["store"] = false, ["max_output_tokens"] = 6000 };
+            payload = new JsonObject { ["model"] = model, ["instructions"] = instructions, ["input"] = input.DeepClone(), ["store"] = false, ["max_output_tokens"] = choice.OutputTokens };
+            if(choice.ReasoningEffort is not null)payload["reasoning"] = new JsonObject { ["effort"] = choice.ReasoningEffort };
             if (tools.Count > 0) payload["tools"] = new JsonArray(tools.Select(t => { var f = Function(t); f["type"] = "function"; return (JsonNode?)f; }).ToArray());
         }
-        using var response = await client.PostAsJsonAsync(compatible ? "chat/completions" : "responses", payload, ct);
-        if (!response.IsSuccessStatusCode) throw new JarvisException($"KI-Provider meldet HTTP {(int)response.StatusCode}. Konfiguration und Kontingent prüfen.", 502);
-        var body = await response.Content.ReadFromJsonAsync<JsonObject>(ct) ?? throw new JarvisException("Leere KI-Antwort.", 502);
+        var reservation = await router.ReserveAsync(owner, choice, System.Text.Encoding.UTF8.GetByteCount(payload.ToJsonString()), tools.Count > 0 ? "agent" : "text", ct);
+        var timer = System.Diagnostics.Stopwatch.StartNew(); JsonObject? body = null;
+        try {
+            using var response = await client.PostAsJsonAsync(compatible ? "chat/completions" : "responses", payload, ct);
+            if (!response.IsSuccessStatusCode) throw new JarvisException($"KI-Provider meldet HTTP {(int)response.StatusCode}. Konfiguration und Kontingent prüfen.", 502);
+            body = await response.Content.ReadFromJsonAsync<JsonObject>(ct) ?? throw new JarvisException("Leere KI-Antwort.", 502);
+        } finally { await router.CompleteAsync(reservation, choice, body?["usage"], timer.ElapsedMilliseconds, body is not null, CancellationToken.None); }
         var output = new JsonArray(); var calls = new List<AiCall>(); var text = "";
         if (compatible)
         {
@@ -74,6 +82,26 @@ public sealed partial class AiClient(IHttpClientFactory factory, Settings settin
             }
         }
         return new(text, output, calls);
+    }
+    public static JsonArray CompatibleMessages(JsonArray input)
+    {
+        var messages = new JsonArray(); JsonObject? pending = null;
+        foreach (var item in input) {
+            if (item?["type"]?.GetValue<string>() == "function_call") {
+                if (pending is null) {
+                    pending = new JsonObject { ["role"] = "assistant", ["content"] = null, ["tool_calls"] = new JsonArray() };
+                    messages.Add(pending);
+                }
+                pending["tool_calls"]!.AsArray().Add(new JsonObject { ["id"] = item["call_id"]!.DeepClone(), ["type"] = "function",
+                    ["function"] = new JsonObject { ["name"] = item["name"]!.DeepClone(), ["arguments"] = item["arguments"]!.DeepClone() } });
+            } else {
+                pending = null;
+                if (item?["type"]?.GetValue<string>() == "function_call_output")
+                    messages.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = item["call_id"]!.DeepClone(), ["content"] = item["output"]!.DeepClone() });
+                else if (item?["role"] is not null) messages.Add(item.DeepClone());
+            }
+        }
+        return messages;
     }
     private static JsonObject Function(ToolDefinition t)
     {

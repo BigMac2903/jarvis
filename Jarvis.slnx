@@ -3,6 +3,10 @@
   <Folder Name="/agents/windows/">
     <Project Path="agents/windows/Jarvis.Windows.csproj" />
   </Folder>
+  <Folder Name="/services/" />
+  <Folder Name="/services/sip/">
+    <Project Path="services/sip/Jarvis.Sip.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Jarvis.Agent/Jarvis.Agent.csproj" />
     <Project Path="src/Jarvis.Api/Jarvis.Api.csproj" />
