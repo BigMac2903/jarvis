@@ -22,10 +22,10 @@ Der Basis-Stack veröffentlicht nur Ports 80 und 443 des Reverse Proxys. Datenba
 
 ## 2. Repository verwenden
 
-Dieses Verzeichnis ist ein lokales Git-Repository. Es wurde noch nicht bei einem Hostingdienst veröffentlicht, daher gibt es noch keine echte Clone-URL. Kopiere es auf deinen Server oder veröffentliche es später in deinem eigenen privaten Repository. Bei einem vorhandenen Remote-Repository ist der Ablauf:
+Das öffentliche Repository ist [BigMac2903/jarvis](https://github.com/BigMac2903/jarvis). Für Unraid verwende den [GitHub-Schnellstart](docs/GITHUB_UNRAID.md). Zum manuellen Klonen:
 
 ```bash
-git clone DEINE-REPOSITORY-URL jarvis
+git clone https://github.com/BigMac2903/jarvis.git jarvis
 cd jarvis
 ```
 

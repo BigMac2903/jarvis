@@ -1,10 +1,10 @@
 # JARVIS von GitHub auf Unraid installieren
 
-Nach dem einmaligen Hochladen deines Projekts gibst du auf Unraid nur noch deinen GitHub-Link ein. Der Installer lädt den Standardbranch, erzeugt interne Schlüssel, erkennt die private Unraid-IPv4, sucht freie Ports ab 8080/8443, richtet die Datenordner ein, baut die Images und startet den Stack. Ein eigenes Docker-Hub-Konto ist dafür nicht nötig.
+Das Projekt ist unter [BigMac2903/jarvis](https://github.com/BigMac2903/jarvis) veröffentlicht. Gib auf Unraid den Link `https://github.com/BigMac2903/jarvis` ein. Der Installer lädt den Standardbranch, erzeugt interne Schlüssel, erkennt die private Unraid-IPv4, sucht freie Ports ab 8080/8443, richtet die Datenordner ein, baut die Images und startet den Stack. Ein eigenes Docker-Hub-Konto ist dafür nicht nötig.
 
-## Einmalig: dein GitHub-Repository anlegen
+## Optional: ein eigenes Repository anlegen
 
-Du hast noch kein Repository. Es wurde auch keines in deinem Namen veröffentlicht.
+Für die Installation aus `BigMac2903/jarvis` ist dieser Schritt nicht erforderlich. Die folgenden Hinweise gelten nur, wenn du eine eigene Kopie veröffentlichen möchtest.
 
 Auf dem PC mit diesem Projekt kannst du in GitHub Desktop **File → Add local repository** wählen und den bestehenden Ordner `outputs/jarvis` hinzufügen. Wähle danach **Publish repository**, einen Namen wie `jarvis` und die gewünschte Sichtbarkeit.
 
@@ -16,7 +16,7 @@ Alternativ kannst du auf [GitHub ein Repository anlegen](https://docs.github.com
 
 ## Auf Unraid: Startblock einfügen und Link eingeben
 
-Starte Array/Pool und Docker. Die Freigabe `/mnt/user/appdata` muss vorhanden sein. Öffne das Unraid-Terminal, kopiere den gesamten folgenden Block hinein und drücke Enter. Danach fragt er nach deinem Repository-Link, etwa `https://github.com/DEIN-NAME/jarvis`.
+Starte Array/Pool und Docker. Die Freigabe `/mnt/user/appdata` muss vorhanden sein. Öffne das Unraid-Terminal, kopiere den gesamten folgenden Block hinein und drücke Enter. Danach gibst du als Repository-Link `https://github.com/BigMac2903/jarvis` ein.
 
 ```bash
 (
