@@ -1,6 +1,6 @@
 # JARVIS Projektstand
 
-Arbeitsphase: Erweiterung um Anforderungen 201–213 am 25.09.2026; lokale Prüfserie und Dokumentation aktualisiert. Das Gesamtziel ist noch NICHT vollständig umgesetzt oder abgenommen. Neu: separater, standardmäßig deaktivierter Local-Network-Agent mit zweifacher Allowlist, privatem DNS, Service Registry, Vault-Credentials, versionsgebundenen Freigaben, Dateiquarantäne und Dashboard. Bestehende Erweiterungen 61–200 bleiben erhalten. Nächste Phase: echte Docker-/Datenbank-/Provider-/LAN-Abnahme und ausdrücklich offene Funktionen aus docs/REQUIREMENTS-61-200.md sowie docs/LOCAL_NETWORK.md.
+Arbeitsphase: Anforderungen 201–213 sowie Unraid-Installationsanleitung am 26.09.2026. Unraid-Compose-Override nutzt bind mounts unter `/mnt/user/appdata/jarvis` und verlegte HTTP(S)-Hostports. Die Anleitung ist nicht auf einem echten Unraid-Server abgenommen. Das Gesamtziel ist noch NICHT vollständig umgesetzt. Nächste Phase: echte Docker-/Datenbank-/Provider-/LAN-Abnahme und offene Funktionen aus docs/REQUIREMENTS-61-200.md sowie docs/LOCAL_NETWORK.md.
 
 ## Architektur
 
@@ -16,6 +16,7 @@ Arbeitsphase: Erweiterung um Anforderungen 201–213 am 25.09.2026; lokale Prüf
 - Zeit-/Cron-/Ereignis-/Kalender-Automationen, Dashboard-Benachrichtigungen.
 - Compose, Dockerfiles, Installations-, Backup- und Verifikationsskripte, CI.
 - LocalNetwork-Tools nur im separaten lokalen Scope, manuelle Registry, begrenzte opt-in Prüfungen bereits registrierter Dienste, explizite Zustimmung zur Übermittlung lokaler Ergebnisse an den Modellanbieter.
+- Unraid-Installationsanleitung in docs/UNRAID_INSTALL.md und Host-Bindmount-/Port-Override docker-compose.unraid.yml.
 
 ## Prüfstand
 

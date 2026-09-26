@@ -1,0 +1,23 @@
+# Unraid-specific bind mounts and host ports. Use together with docker-compose.yml.
+services:
+  postgres:
+    volumes:
+      - /mnt/user/appdata/jarvis/postgres:/var/lib/postgresql/data
+  redis:
+    volumes:
+      - /mnt/user/appdata/jarvis/redis:/data
+  jarvis-api:
+    volumes:
+      - /mnt/user/appdata/jarvis/api:/data/jarvis
+      - /mnt/user/appdata/jarvis/obsidian:/data/obsidian
+  jarvis-browser:
+    volumes:
+      - /mnt/user/appdata/jarvis/browser:/data
+  reverse-proxy:
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /mnt/user/appdata/jarvis/caddy:/data
+      - /mnt/user/appdata/jarvis/caddy-config:/config
