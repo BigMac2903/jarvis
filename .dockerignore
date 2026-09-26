@@ -9,3 +9,15 @@ artifacts
 **/__pycache__
 data
 backups
+postgres
+redis
+api
+browser
+caddy
+caddy-config
+obsidian
+tools
+START-HIER.txt
+caddy-root.crt
+.install.lock
+.checkout.lock

@@ -1,6 +1,6 @@
 # JARVIS Projektstand
 
-Arbeitsphase: Anforderungen 201–213 sowie Unraid-Installationsanleitung am 26.09.2026. Unraid-Compose-Override nutzt bind mounts unter `/mnt/user/appdata/jarvis` und verlegte HTTP(S)-Hostports. Die Anleitung ist nicht auf einem echten Unraid-Server abgenommen. Das Gesamtziel ist noch NICHT vollständig umgesetzt. Nächste Phase: echte Docker-/Datenbank-/Provider-/LAN-Abnahme und offene Funktionen aus docs/REQUIREMENTS-61-200.md sowie docs/LOCAL_NETWORK.md.
+Arbeitsphase: Anforderungen 201–213 sowie Unraid-/GitHub-Installation am 26.09.2026. Automatischer GitHub-Link-Installer und Compose-Verwalter ergänzt. Unraid-Override nutzt bind mounts unter `/mnt/user/appdata/jarvis` und verlegte HTTP(S)-Hostports. Die zusammengeführte Compose-Konfiguration wurde lokal auf gewählte Ports und Bindmounts geprüft; Bash-Tests sind nur als Linux-CI-Job vorbereitet. Kein echter Unraid-Start und keine GitHub-Veröffentlichung ausgeführt. Das Gesamtziel ist noch NICHT vollständig umgesetzt. Nächste Phase: echte Docker-/Datenbank-/Provider-/LAN-Abnahme und offene Funktionen aus docs/REQUIREMENTS-61-200.md sowie docs/LOCAL_NETWORK.md.
 
 ## Architektur
 
@@ -17,6 +17,7 @@ Arbeitsphase: Anforderungen 201–213 sowie Unraid-Installationsanleitung am 26.
 - Compose, Dockerfiles, Installations-, Backup- und Verifikationsskripte, CI.
 - LocalNetwork-Tools nur im separaten lokalen Scope, manuelle Registry, begrenzte opt-in Prüfungen bereits registrierter Dienste, explizite Zustimmung zur Übermittlung lokaler Ergebnisse an den Modellanbieter.
 - Unraid-Installationsanleitung in docs/UNRAID_INSTALL.md und Host-Bindmount-/Port-Override docker-compose.unraid.yml.
+- GitHub-Link-Installer: install-from-github.sh, install-unraid.sh und unraid-compose.sh. Automatische private IPv4-/Portkonfiguration, Schlüsselgenerierung, Compose-Fallback mit festgelegtem SHA-256 und GitHub-Anleitung. Kein Repository im Namen des Benutzers veröffentlicht. Funktionstests als Linux-CI-Job ergänzt; mangels lokaler Bash-Laufzeit hier nicht ausgeführt. Ein echter Unraid-Start bleibt offen.
 
 ## Prüfstand
 

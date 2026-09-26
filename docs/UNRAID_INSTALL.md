@@ -1,5 +1,7 @@
 # JARVIS auf Unraid installieren
 
+Für die automatische Installation mit deinem Repository-Link nutze den [GitHub-Schnellstart](GITHUB_UNRAID.md). Die folgenden Schritte beschreiben die manuelle Variante.
+
 Diese Anleitung richtet den normalen JARVIS-Stack auf einem Unraid-Server ein. Sie verwendet die Compose-Dateien des Projekts und speichert Anwendungsdaten dauerhaft unter `/mnt/user/appdata/jarvis`. SIP-Telefonie und der optionale Local-Network-Agent werden anschließend bei Bedarf eingeschaltet.
 
 Als grobe Ausgangsbasis empfiehlt das Projekt vier CPU-Kerne, 8 GB RAM und 15 GB freien Speicher. Die tatsächliche Nutzung hängt von Browsern, Aufgaben und optionaler lokaler KI ab. Lege `appdata` möglichst auf einem SSD-Pool an.

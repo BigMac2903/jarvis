@@ -13,3 +13,16 @@ backups/
 TestResults/
 *.tsbuildinfo
 artifacts/
+# Unraid runtime directories when source and state share a parent (legacy install).
+/postgres/
+/redis/
+/api/
+/browser/
+/caddy/
+/caddy-config/
+/obsidian/
+/tools/
+/START-HIER.txt
+/caddy-root.crt
+/.install.lock
+/.checkout.lock

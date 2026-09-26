@@ -3,6 +3,17 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
+  unraid-installer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          for script in install-unraid.sh install-from-github.sh unraid-compose.sh scripts/unraid-common.sh tests/unraid/test-installer.sh; do
+            bash -n "$script"
+          done
+      - run: bash tests/unraid/test-installer.sh
+      - run: bash install.sh --configure-only
+      - run: docker compose -f docker-compose.yml -f docker-compose.unraid.yml config --quiet
   backend:
     runs-on: ubuntu-latest
     services:

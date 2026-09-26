@@ -6,7 +6,7 @@ Neu: SIP als Standardtelefonie, Nextcloud/Immich, verschlüsseltes persönliches
 
 Ergänzung 201–213: [Local Network](docs/LOCAL_NETWORK.md) mit separatem Agenten, zweistufiger Allowlist, explizitem lokalem DNS, Registry, Vault-Credentials, lokalem Auftragskontext und begrenzten Prüfungen. Standardmäßig deaktiviert. Die frühere Research-Ausnahme `INTERNAL_ALLOW_HOSTS` entfällt; private Nextcloud-/Immich-Endpunkte müssen über den lokalen Zugriff eingerichtet werden. Die Anleitung beschreibt die noch fehlende Durchleitung der Spezialadapter sowie den VPN-Prüfstand.
 
-Unraid-Einrichtung: [Schritt-für-Schritt-Anleitung](docs/UNRAID_INSTALL.md) mit Compose-Overrides, dauerhaften `appdata`-Pfaden und lokalen HTTPS-Zertifikaten.
+Unraid mit GitHub-Link installieren: [GitHub-Schnellstart](docs/GITHUB_UNRAID.md). Der Installer erkennt die Server-IP, wählt freie Ports, erzeugt Schlüssel und startet Docker. Den Kopierblock findest du in [UNRAID-START.txt](UNRAID-START.txt). Alternativ: [manuelle Unraid-Anleitung](docs/UNRAID_INSTALL.md).
 
 **Prüfstand:** Quellcode, lokale Builds, Sicherheitsprüfungen und ein echter Chromium-Smoke-Test sind vorhanden. Auf dem Entwicklungsrechner fehlt die Docker-Engine; der vollständige Containerstart und die PostgreSQL-/Redis-Integration sind dort noch nicht abgenommen. Dies ist keine Behauptung eines fertig geprüften Produktivsystems. Details und verbleibende Grenzen stehen in [PROJECT_STATE.md](PROJECT_STATE.md) und [Funktionsstatus](docs/STATUS.md).
 
