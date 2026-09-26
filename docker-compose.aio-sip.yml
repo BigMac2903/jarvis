@@ -1,0 +1,8 @@
+# Only enabled explicitly. Restrict these ports to your PBX/media peers at the host firewall.
+services:
+  jarvis:
+    ports:
+      - "${SIP_BIND_ADDRESS:-127.0.0.1}:5060:5060/udp"
+      - "${SIP_BIND_ADDRESS:-127.0.0.1}:5060:5060/tcp"
+      - "${SIP_BIND_ADDRESS:-127.0.0.1}:5061:5061/tcp"
+      - "${SIP_BIND_ADDRESS:-127.0.0.1}:20000-20099:20000-20099/udp"

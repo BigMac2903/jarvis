@@ -1,5 +1,7 @@
 # JARVIS
 
+**Unraid + vorhandenes Zoraxy, ein Container:** [Einrichtung und sichere Umstellung](docs/UNRAID_AIO_ZORAXY.md) für `https://jarvis.mc-media.eu`. Kein zusätzlicher Caddy. Die bisherige Mehrcontainer-Variante bleibt als Alternative erhalten.
+
 Ein persönlicher, lokal selbst hostbarer KI-Assistent mit Chat, Sprache, Recherche, Quellen, freigegebenen Geräten und bestätigten Aktionen.
 
 Neu: SIP als Standardtelefonie, Nextcloud/Immich, verschlüsseltes persönliches Memory mit Importvorschau, Aufgaben/Ziele, Ereignisregeln sowie Modellregistry und Budgetjournal. Einrichtung: [SIP](docs/SIP.md) und [Operator/Konnektoren/Modelle](docs/OPERATOR.md). Die [Matrix 61–200](docs/REQUIREMENTS-61-200.md) nennt ausdrücklich auch noch fehlende Anforderungen.

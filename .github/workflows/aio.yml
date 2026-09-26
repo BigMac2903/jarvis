@@ -1,0 +1,35 @@
+name: single-container
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  aio:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      AIO_BIND_ADDRESS: 127.0.0.1
+      AIO_HTTP_PORT: "18090"
+      AIO_DATA_ROOT: /tmp/jarvis-aio-ci
+      AIO_CI_TEST: disposable
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s tests/aio -v
+      - run: bash -n install-unraid-aio.sh && bash -n aio-compose.sh
+      - run: |
+          bash install.sh --configure-only
+          sed -i 's|^PUBLIC_URL=.*|PUBLIC_URL=https://jarvis.mc-media.eu|' .env
+          docker compose -f docker-compose.aio.yml config --quiet
+          # Reproduce the original Unraid umask 077 checkout, including nginx config.
+          chmod 600 services/browser/*.py docker/aio/*.py docker/aio/nginx.conf
+          docker compose -f docker-compose.aio.yml build
+      - run: docker compose -f docker-compose.aio.yml up -d --wait --wait-timeout 420
+      - run: python3 tests/aio/smoke.py
+      - run: |
+          docker compose -f docker-compose.aio.yml stop
+          docker compose -f docker-compose.aio.yml up -d --wait --wait-timeout 420
+          AIO_CI_RESTART=true python3 tests/aio/smoke.py
+          test "$(docker compose -f docker-compose.aio.yml ps -q | wc -l)" -eq 1
+      - run: docker compose -f docker-compose.aio.yml logs --no-color --tail=150
+        if: failure()
+      - run: docker compose -f docker-compose.aio.yml down
+        if: always()

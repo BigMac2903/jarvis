@@ -2,6 +2,7 @@
 import asyncio
 import ipaddress
 import socket
+import os
 from urllib.parse import urlsplit
 
 
@@ -87,7 +88,7 @@ async def handle(reader, writer):
             upstream.close()
 
 async def main():
-    server = await asyncio.start_server(handle, "0.0.0.0", 8888, limit=32768)
+    server = await asyncio.start_server(handle, os.getenv("EGRESS_LISTEN_ADDRESS", "0.0.0.0"), 8888, limit=32768)
     async with server:
         await server.serve_forever()
 

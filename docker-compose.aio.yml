@@ -1,0 +1,36 @@
+name: jarvis-aio
+services:
+  jarvis:
+    image: jarvis-aio:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.aio
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 180s
+    env_file: .env
+    environment:
+      AIO_ACCEPT_SHARED_NETWORK: "true"
+    ports:
+      - "${AIO_BIND_ADDRESS:-127.0.0.1}:${AIO_HTTP_PORT:-8090}:8080"
+    volumes:
+      - ${AIO_DATA_ROOT:-/mnt/user/appdata/jarvis}/postgres:/data/postgres
+      - ${AIO_DATA_ROOT:-/mnt/user/appdata/jarvis}/redis:/data/redis
+      - ${AIO_DATA_ROOT:-/mnt/user/appdata/jarvis}/api:/data/jarvis
+      - ${AIO_DATA_ROOT:-/mnt/user/appdata/jarvis}/browser:/data/browser
+      - ${AIO_DATA_ROOT:-/mnt/user/appdata/jarvis}/obsidian:/data/obsidian
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+      - /run:mode=755
+    shm_size: 512mb
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, KILL]
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./docker/aio/seccomp.json
+    pids_limit: 512
+    mem_limit: 4g
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

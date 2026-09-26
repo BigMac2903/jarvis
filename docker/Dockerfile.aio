@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
+WORKDIR /repo
+COPY Directory.Build.props .
+COPY src/ src/
+COPY services/sip/ services/sip/
+COPY services/local-network/ services/local-network/
+RUN dotnet publish src/Jarvis.Api/Jarvis.Api.csproj -c Release -r linux-x64 --self-contained true -o /out/api \
+ && dotnet publish services/sip/Jarvis.Sip.csproj -c Release -r linux-x64 --self-contained true -o /out/sip \
+ && dotnet publish services/local-network/Jarvis.LocalNetwork.csproj -c Release -r linux-x64 --self-contained true -o /out/lan
+
+FROM node:22-bookworm-slim AS frontend
+WORKDIR /web
+COPY src/Jarvis.Web/package*.json ./
+RUN npm ci
+COPY src/Jarvis.Web/ ./
+RUN npm run build
+
+FROM redis:7.4-bookworm AS redis
+FROM postgres:17-bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-venv nginx curl ca-certificates libicu72 libssl3 libstdc++6 \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd -g 1654 jarvis && useradd -u 1654 -g 1654 -M jarvis \
+ && groupadd -g 10001 browser && useradd -u 10001 -g 10001 -M browser \
+ && groupadd -g 10002 egress && useradd -u 10002 -g 10002 -M egress \
+ && groupadd -g 10003 web && useradd -u 10003 -g 10003 -M web \
+ && groupadd -g 10004 cache && useradd -u 10004 -g 10004 -M cache \
+ && python3 -m venv /opt/browser
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+COPY --chmod=644 services/browser/requirements.txt /tmp/browser-requirements.txt
+RUN /opt/browser/bin/pip install --no-cache-dir -r /tmp/browser-requirements.txt \
+ && /opt/browser/bin/playwright install --with-deps chromium \
+ && chmod -R a+rX /ms-playwright
+COPY --from=redis /usr/local/bin/redis-server /usr/local/bin/redis-cli /usr/local/bin/
+COPY --from=backend /out/ /app/
+COPY --from=frontend /web/dist/ /app/web/
+COPY --chmod=644 services/browser/*.py /app/browser/
+COPY --chmod=644 docker/aio/ /app/aio/
+RUN chmod -R a+rX /app && chmod 755 /app/api/Jarvis.Api /app/sip/Jarvis.Sip /app/lan/Jarvis.LocalNetwork
+WORKDIR /app
+EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=10s --start-period=120s --retries=8 CMD python3 /app/aio/health.py
+ENTRYPOINT ["python3", "/app/aio/manager.py"]
