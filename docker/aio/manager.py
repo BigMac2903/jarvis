@@ -91,9 +91,12 @@ def shutdown():
     for name, process in reversed(children):
         if process.poll() is not None:
             continue
-        os.killpg(process.pid, signal.SIGINT if name == "postgres" else signal.SIGTERM)
         try:
-            process.wait(timeout=35)
+            os.killpg(process.pid, signal.SIGINT if name == "postgres" else signal.SIGTERM)
+        except ProcessLookupError:
+            continue
+        try:
+            process.wait(timeout=90 if name == "postgres" else 10)
         except subprocess.TimeoutExpired:
             print(f"Forced shutdown: {name}", flush=True)
             os.killpg(process.pid, signal.SIGKILL)
@@ -137,8 +140,7 @@ def main():
     redis_conf.write_text("bind 127.0.0.1\nprotected-mode yes\nport 6379\ndir /data/redis\nappendonly yes\nrequirepass " + env["REDIS_PASSWORD"] + "\n")
     redis_conf.chmod(0o600)
     os.chown(redis_conf, 10004, 10004)
-    # Old Redis image uses UID 999. Run as that UID for existing cache ownership.
-    # Only cache-owned files need migration; never traverse links or another mount.
+    # Redis now has a different UID from PostgreSQL. Migrate only cache ownership.
     for root, dirs, files in os.walk("/data/redis", followlinks=False):
         for name in dirs + files:
             p = Path(root) / name
@@ -147,7 +149,7 @@ def main():
             os.chown(p, 10004, 10004)
     start("redis", ["redis-server", str(redis_conf)], 10004)
     wait_for(lambda: subprocess.run(["redis-cli", "ping"], env=environment({"REDISCLI_AUTH": env["REDIS_PASSWORD"]}),
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0)
+                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.strip() == b"PONG")
     start("egress", ["python3", "/app/browser/egress.py"], 10002, {"EGRESS_LISTEN_ADDRESS": "127.0.0.1"})
     start("browser", ["/opt/browser/bin/uvicorn", "service:app", "--host", "127.0.0.1", "--port", "8000", "--no-access-log"],
           10001, {"HOME": "/tmp/browser", "BROWSER_DATA": "/data/browser", "PLAYWRIGHT_BROWSERS_PATH": "/ms-playwright",
@@ -156,6 +158,8 @@ def main():
     api_keys = ("PUBLIC_URL", "MASTER_KEY", "SETUP_TOKEN", "BROWSER_TOKEN", "SIP_SERVICE_TOKEN", "LOCAL_NETWORK_TOKEN")
     api_env = {key: env[key] for key in api_keys} | {
         "HOME": "/tmp/api", "ASPNETCORE_URLS": "http://127.0.0.1:5000",
+        "Logging__LogLevel__Microsoft.AspNetCore": "Warning",
+        "Logging__LogLevel__System.Net.Http.HttpClient": "None",
         "DATABASE_URL": f"Host=127.0.0.1;Database=jarvis;Username=jarvis;Password={env['POSTGRES_PASSWORD']}",
         "REDIS_URL": f"127.0.0.1:6379,password={env['REDIS_PASSWORD']},abortConnect=false",
         "BROWSER_URL": "http://127.0.0.1:8000", "PUBLIC_CONNECTOR_PROXY": "http://127.0.0.1:8888",
@@ -172,6 +176,7 @@ def main():
               {"ASPNETCORE_URLS": "http://127.0.0.1:5002"}, "/app/lan")
     wait_for(lambda: http_ready(8000, "/health"), 180)
     start("web", ["nginx", "-c", "/app/aio/nginx.conf", "-g", "daemon off;"], 10003)
+    wait_for(lambda: http_ready(8080, "/healthz"))
     print("JARVIS AIO ready on HTTP port 8080; HTTPS terminates at Zoraxy.", flush=True)
     while not stopping:
         check_children()

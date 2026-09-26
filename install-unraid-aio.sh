@@ -11,7 +11,7 @@ migrate=false
 [[ -z "${1:-}" || "${1:-}" == --migrate ]] || { jarvis_fail 'Aufruf: install-unraid-aio.sh [--migrate]'; exit 1; }
 [[ -f /etc/unraid-version && "$EUID" == 0 ]] || { jarvis_fail 'Im Unraid-Terminal als root starten.'; exit 1; }
 [[ -d /mnt/user/appdata ]] || { jarvis_fail 'appdata fehlt.'; exit 1; }
-for command in docker openssl flock tar stat du df awk curl sha256sum ip ss; do command -v "$command" >/dev/null || { jarvis_fail "$command fehlt"; exit 1; }; done
+for command in docker openssl flock tar stat du df awk curl sha256sum ip ss find grep; do command -v "$command" >/dev/null || { jarvis_fail "$command fehlt"; exit 1; }; done
 mkdir -p "$root"
 exec 9>"$root/.install.lock"
 flock -n 9 || { jarvis_fail 'Ein Installer läuft bereits.'; exit 1; }
@@ -32,12 +32,19 @@ if ((${#old_ids[@]})); then
     mounts="$(docker inspect --format '{{range .Mounts}}{{println .Type .Source}}{{end}}' "$id")"
     grep -Fxq "bind $root/$directory" <<< "$mounts" || { jarvis_fail "Abweichender Speicher für $service. Keine automatische Migration."; exit 1; }
   done
+  api_id="$(docker ps -aq --filter label=com.docker.compose.project=jarvis --filter label=com.docker.compose.service=jarvis-api)"
+  obsidian_mount="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/data/obsidian"}}{{.Type}} {{.Source}}{{end}}{{end}}' "$api_id")"
+  [[ "$obsidian_mount" == "bind $root/obsidian" ]] || { jarvis_fail 'Abweichender Obsidian-Pfad; manuelle Migration erforderlich.'; exit 1; }
 fi
 existing=false
 for directory in postgres redis api browser obsidian; do
   [[ ! -L "$root/$directory" ]] || { jarvis_fail "Symlink abgewiesen: $directory"; exit 1; }
   if [[ -d "$root/$directory" && -n "$(find "$root/$directory" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then existing=true; fi
 done
+if [[ -f "$root/postgres/PG_VERSION" && "$(< "$root/postgres/PG_VERSION")" != 17 ]]; then jarvis_fail 'Nur PostgreSQL 17 wird unterstützt.'; exit 1; fi
+if [[ -d "$root/postgres/pg_tblspc" && -n "$(find "$root/postgres/pg_tblspc" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+  jarvis_fail 'Externe PostgreSQL-Tablespaces benötigen eine eigene Sicherung/Migration.'; exit 1
+fi
 if "$existing" && [[ ! -f "$env_file" ]]; then jarvis_fail 'Daten vorhanden: originale .env fehlt. Abbruch ohne Schlüsselerzeugung.'; exit 1; fi
 [[ -f "$env_file" ]] || cp "$source_dir/.env.example" "$env_file"
 for key in POSTGRES_PASSWORD REDIS_PASSWORD MASTER_KEY BROWSER_MASTER_KEY BROWSER_TOKEN SETUP_TOKEN SIP_SERVICE_TOKEN LOCAL_NETWORK_TOKEN; do
@@ -74,6 +81,16 @@ bash "$source_dir/aio-compose.sh" build
 bash "$source_dir/aio-compose.sh" run --rm --no-deps --entrypoint python3 jarvis -c 'import sys,os; sys.path.insert(0,"/app/aio"); from manager import validate; validate(os.environ)'
 old_running=()
 mapfile -t old_running < <(docker ps -q --filter label=com.docker.compose.project=jarvis)
+aio_started=false
+restore_before_start() {
+  # Before AIO accesses the data, restoring the original stack is safe.
+  if ! "$aio_started"; then
+    cp -p "$config_backup" "$env_file"
+    if ((${#old_running[@]})); then docker start "${old_running[@]}" || true; fi
+  fi
+  printf 'AIO-Installation abgebrochen. Daten und Sicherungen wurden nicht gelöscht.\n' >&2
+}
+trap restore_before_start ERR
 if ((${#old_running[@]})); then docker stop -t 120 "${old_running[@]}"; fi
 if "$existing" && ((${#old_ids[@]})); then
   backup="$(mktemp -d "$root/backups-aio.XXXXXX")"
@@ -87,6 +104,7 @@ if "$existing" && ((${#old_ids[@]})); then
   fi
   printf 'Konsistente Datensicherung und Originalschlüssel: %s\n' "$backup"
 fi
+aio_started=true
 if ! bash "$source_dir/aio-compose.sh" up -d --wait --wait-timeout 600; then
   printf 'AIO-Start fehlgeschlagen. Alte Container bleiben gestoppt, Daten und Sicherung bleiben erhalten.\n'
   printf 'Logs: bash %q/aio-compose.sh logs --tail=100\n' "$source_dir"
